@@ -1,0 +1,474 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+
+# ── Defaults (override via flags or env vars) ───────────────────────────
+EVENTS=20
+HOSTS=2
+USERS=2
+EPISODES="noise1"
+START_DATE="1d"
+END_DATE="now"
+WORKFLOW_ID="workflow-3cf6d7f4-864f-4722-834d-ae1743f445ea"
+LOOKBACK="now-2d"
+INSIGHTS_RULE_ID_STATIC="61e90241-c8f2-47bc-8e47-238420a34fb6"
+WAIT_SECS=20
+FIXTURES_FILE="$SCRIPT_DIR/fixtures/alerts.json"
+
+usage() {
+  cat <<EOF
+Usage: $(basename "$0") [OPTIONS]
+
+Automates: delete alerts → create rules → set workflow action → index episode
+data → trigger rule with extended lookback so workflow actions fire.
+
+Standalone: no Kibana repo required.
+
+Options:
+  -n, --events NUM        Number of source events (default: $EVENTS)
+  --hosts NUM             Number of hosts (default: $HOSTS)
+  -u, --users NUM         Number of users (default: $USERS)
+  --episodes IDS          Comma-separated episode IDs (default: $EPISODES)
+  --start-date DATE       Date math start (default: $START_DATE)
+  --end-date DATE         Date math end (default: $END_DATE)
+  --workflow-id ID        Workflow ID for rule action (default: $WORKFLOW_ID)
+  --lookback EXPR         Rule lookback expression (default: $LOOKBACK)
+  --wait SECS             Seconds to wait for rule execution (default: $WAIT_SECS)
+  --fixtures FILE         Path to alerts JSON file (default: fixtures/alerts.json)
+  --help                  Show this help
+EOF
+  exit 0
+}
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -n|--events)   EVENTS="$2"; shift 2 ;;
+    --hosts)       HOSTS="$2"; shift 2 ;;
+    -u|--users)    USERS="$2"; shift 2 ;;
+    --episodes)    EPISODES="$2"; shift 2 ;;
+    --start-date)  START_DATE="$2"; shift 2 ;;
+    --end-date)    END_DATE="$2"; shift 2 ;;
+    --workflow-id) WORKFLOW_ID="$2"; shift 2 ;;
+    --lookback)    LOOKBACK="$2"; shift 2 ;;
+    --wait)        WAIT_SECS="$2"; shift 2 ;;
+    --fixtures)    FIXTURES_FILE="$2"; shift 2 ;;
+    -h|--help)     usage ;;
+    *) echo "Unknown option: $1"; usage ;;
+  esac
+done
+
+# ── Inline: Kibana connection detection ─────────────────────────────────
+KIBANA_URL="${KIBANA_URL:-}"
+KIBANA_AUTH="${KIBANA_AUTH:-}"
+
+_try_kibana() {
+  local url="$1" auth="$2" http_code
+  http_code="$(curl -s -o /dev/null -w "%{http_code}" -k "$url/api/status" 2>/dev/null || echo "000")"
+  [[ "$http_code" == "000" ]] && return 1
+  http_code="$(curl -s -o /dev/null -w "%{http_code}" -k -u "$auth" \
+    -H "kbn-xsrf: true" -H "x-elastic-internal-origin: Kibana" \
+    "$url/api/data_sources" 2>/dev/null || echo "000")"
+  [[ "$http_code" != "000" && "$http_code" != "401" ]]
+}
+
+detect_kibana() {
+  local _URLS=("http://localhost:5601" "https://localhost:5601")
+  local _AUTHS=("elastic:changeme" "elastic_serverless:changeme")
+
+  if [[ -n "$KIBANA_URL" && -n "$KIBANA_AUTH" ]]; then
+    _try_kibana "$KIBANA_URL" "$KIBANA_AUTH" && return 0
+    echo "Warning: Provided KIBANA_URL=$KIBANA_URL did not respond. Falling back to auto-detection." >&2
+    KIBANA_URL="" KIBANA_AUTH=""
+  fi
+
+  if [[ -n "$KIBANA_URL" ]]; then
+    for auth in "${_AUTHS[@]}"; do
+      if _try_kibana "$KIBANA_URL" "$auth"; then
+        KIBANA_AUTH="$auth"; return 0
+      fi
+    done
+    echo "Error: Kibana at $KIBANA_URL did not respond with any known credentials." >&2
+    return 1
+  fi
+
+  for url in "${_URLS[@]}"; do
+    for auth in "${_AUTHS[@]}"; do
+      if _try_kibana "$url" "$auth"; then
+        KIBANA_URL="$url" KIBANA_AUTH="$auth"
+        echo "Detected Kibana at $KIBANA_URL (auth: ${auth%%:*})" >&2
+        return 0
+      fi
+    done
+  done
+
+  echo "Error: Could not detect a running Kibana instance." >&2
+  echo "Please ensure Kibana is running, or set KIBANA_URL and KIBANA_AUTH explicitly." >&2
+  return 1
+}
+
+kibana_curl() {
+  local tls_flag=""
+  [[ "$KIBANA_URL" == https://* ]] && tls_flag="-k"
+  curl -s $tls_flag -u "$KIBANA_AUTH" \
+    -H "kbn-xsrf: true" \
+    -H "x-elastic-internal-origin: Kibana" \
+    "$@"
+}
+
+detect_kibana
+ES_URL="${KIBANA_URL/5601/9200}"
+
+es_curl() {
+  curl -s -u "$KIBANA_AUTH" "$@"
+}
+
+step() {
+  echo ""
+  echo "━━━ $1 ━━━"
+}
+
+# ── Step 1: Delete all security alerts ──────────────────────────────────
+step "1/5  Deleting existing security alerts"
+
+deleted=$(es_curl -X POST "$ES_URL/.alerts-security.alerts-default/_delete_by_query" \
+  -H "Content-Type: application/json" \
+  -d '{"query":{"match_all":{}}}' 2>/dev/null \
+  | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('deleted',0))" 2>/dev/null || echo "0")
+echo "  Deleted $deleted alert(s)"
+
+ALL_INDICES=$(es_curl "$ES_URL/_cat/indices/insights-alerts-*,logs-endpoint.*?h=index" 2>/dev/null | tr '\n' ',' | sed 's/,$//' || true)
+if [[ -n "$ALL_INDICES" && "$ALL_INDICES" != *"error"* ]]; then
+  es_curl -X DELETE "$ES_URL/$ALL_INDICES" > /dev/null 2>&1 || true
+  echo "  Deleted episode indices"
+else
+  echo "  No episode indices to delete"
+fi
+
+# ── Step 2: Ensure Insights rule exists ─────────────────────────────────
+step "2/5  Ensuring Insights rule exists"
+
+NDJSON_TMPFILE="$(mktemp /tmp/endpoint_alert_XXXXXX.ndjson)"
+trap 'rm -f "$NDJSON_TMPFILE"' EXIT
+cat > "$NDJSON_TMPFILE" <<'NDJSON_EOF'
+{"id":"7b75f973-e958-4a09-bc49-6dd05d88e7e4","updated_at":"2024-03-25T00:42:30.397Z","updated_by":"mock.user@elastic.co","created_at":"2024-03-25T00:39:58.881Z","created_by":"mock.user@elastic.co","name":"Endpoint Security [Insights]","tags":["Data Source: Elastic Defend"],"interval":"5m","enabled":false,"revision":2,"description":"Generates a detection alert each time an Elastic Endpoint Security alert is received. Enabling this rule allows you to immediately begin investigating your Endpoint alerts.","risk_score":47,"severity":"medium","license":"Elastic License v2","output_index":"","meta":{"from":"5m","kibana_siem_app_url":"https://mockurl.io/app/security"},"rule_name_override":"message","timestamp_override":"event.ingested","timestamp_override_fallback_disabled":false,"author":["Elastic"],"false_positives":[],"from":"now-600s","rule_id":"61e90241-c8f2-47bc-8e47-238420a34fb6","max_signals":10000,"risk_score_mapping":[{"field":"event.risk_score","operator":"equals","value":""}],"severity_mapping":[{"field":"event.severity","operator":"equals","severity":"low","value":"21"},{"field":"event.severity","operator":"equals","severity":"medium","value":"47"},{"field":"event.severity","operator":"equals","severity":"high","value":"73"},{"field":"event.severity","operator":"equals","severity":"critical","value":"99"}],"threat":[],"to":"now","references":[],"version":102,"exceptions_list":[],"immutable":false,"related_integrations":[],"required_fields":[],"setup":"","type":"query","language":"kuery","index":["insights-alerts-*"],"query":"event.kind:alert and event.module:(endpoint and not endgame)\n","filters":[],"actions":[]}
+{"exported_count":1,"exported_rules_count":1,"missing_rules":[],"missing_rules_count":0,"exported_exception_list_count":0,"exported_exception_list_item_count":0,"missing_exception_list_item_count":0,"missing_exception_list_items":[],"missing_exception_lists":[],"missing_exception_lists_count":0,"exported_action_connector_count":0,"missing_action_connection_count":0,"missing_action_connections":[],"excluded_action_connection_count":0,"excluded_action_connections":[]}
+NDJSON_EOF
+
+rule_count=$(kibana_curl -X GET "$KIBANA_URL/api/detection_engine/rules/_find?per_page=1&filter=alert.attributes.name:%22Endpoint%20Security%20%5BInsights%5D%22" \
+  -H "elastic-api-version: 2023-10-31" \
+  | python3 -c "import sys,json; print(json.load(sys.stdin).get('total',0))" 2>/dev/null || echo "0")
+
+if [[ "$rule_count" == "0" ]]; then
+  echo "  Importing Insights rule..."
+  import_result=$(kibana_curl -X POST "$KIBANA_URL/api/detection_engine/rules/_import" \
+    -H "elastic-api-version: 2023-10-31" \
+    -F "file=@$NDJSON_TMPFILE")
+  success=$(echo "$import_result" | python3 -c "import sys,json; print(json.load(sys.stdin).get('success_count',0))" 2>/dev/null)
+  echo "  Imported: $success rule(s)"
+else
+  echo "  Insights rule already exists"
+fi
+
+INSIGHTS_RULE_ID=$(kibana_curl -X GET "$KIBANA_URL/api/detection_engine/rules/_find?per_page=1&filter=alert.attributes.name:%22Endpoint%20Security%20%5BInsights%5D%22" \
+  -H "elastic-api-version: 2023-10-31" \
+  | python3 -c "import sys,json; d=json.load(sys.stdin); [print(r['id']) for r in d.get('data',[])]" 2>/dev/null || echo "$INSIGHTS_RULE_ID_STATIC")
+INSIGHTS_RULE_ID="${INSIGHTS_RULE_ID:-$INSIGHTS_RULE_ID_STATIC}"
+echo "  Insights rule ID: $INSIGHTS_RULE_ID"
+
+# ── Step 3: Set workflow action on all rules ────────────────────────────
+step "3/5  Setting workflow action on all rules"
+
+bulk_result=$(python3 -c "
+import json, subprocess
+payload = {
+    'action': 'edit',
+    'query': '',
+    'edit': [{
+        'type': 'set_rule_actions',
+        'value': {
+            'actions': [{
+                'id': 'system-connector-.workflows',
+                'params': {
+                    'subAction': 'run',
+                    'subActionParams': {
+                        'workflowId': '$WORKFLOW_ID',
+                        'summaryMode': False
+                    }
+                }
+            }]
+        }
+    }]
+}
+r = subprocess.run([
+    'curl', '-s', '-X', 'POST',
+    '$KIBANA_URL/api/detection_engine/rules/_bulk_action',
+    '-H', 'kbn-xsrf: true',
+    '-H', 'elastic-api-version: 2023-10-31',
+    '-H', 'x-elastic-internal-origin: kibana',
+    '-H', 'Content-Type: application/json',
+    '-u', '$KIBANA_AUTH',
+    '-d', json.dumps(payload)
+], capture_output=True, text=True)
+d = json.loads(r.stdout)
+s = d.get('attributes', {}).get('summary', {})
+print(f\"succeeded={s.get('succeeded',0)} failed={s.get('failed',0)}\")
+")
+echo "  Workflow action: $bulk_result"
+
+# ── Step 4: Index alerts from fixtures file ─────────────────────────────
+step "4/5  Indexing alerts (50% noise / 50% attack, N=$EVENTS, fixtures=$(basename "$FIXTURES_FILE"))"
+
+_SEC_ES_URL="$ES_URL" \
+_SEC_KIBANA_AUTH="$KIBANA_AUTH" \
+_SEC_START_DATE="$START_DATE" \
+_SEC_END_DATE="$END_DATE" \
+_SEC_EVENTS="$EVENTS" \
+_SEC_HOSTS="$HOSTS" \
+_SEC_USERS="$USERS" \
+_SEC_FIXTURES_FILE="$FIXTURES_FILE" \
+python3 - <<'PYEOF'
+import json, sys, hashlib, copy, os, base64
+import urllib.request, urllib.error
+from datetime import datetime, timezone, timedelta
+import re
+
+# ── Connection ───────────────────────────────────────────────────────────
+ES_URL         = os.environ['_SEC_ES_URL']
+KIBANA_AUTH    = os.environ['_SEC_KIBANA_AUTH']
+ES_USER, ES_PASS = KIBANA_AUTH.split(':', 1)
+START_DATE_ARG = os.environ['_SEC_START_DATE']
+END_DATE_ARG   = os.environ['_SEC_END_DATE']
+TARGET_EVENTS  = int(os.environ['_SEC_EVENTS'])
+HOST_COUNT     = int(os.environ['_SEC_HOSTS'])
+USER_COUNT     = int(os.environ['_SEC_USERS'])
+FIXTURES_FILE  = os.environ['_SEC_FIXTURES_FILE']
+
+# ── Load fixtures ────────────────────────────────────────────────────────
+# Flat JSON array of alert docs.
+# odd  kibana.alert.risk_score  →  noise pool   (false positives)
+# even kibana.alert.risk_score  →  attack pool  (true positives)
+if not os.path.isfile(FIXTURES_FILE):
+    print(f"ERROR: fixtures file not found: {FIXTURES_FILE}", file=sys.stderr)
+    print("Place your alerts.json in the fixtures/ directory, or pass --fixtures <path>.", file=sys.stderr)
+    sys.exit(1)
+
+with open(FIXTURES_FILE) as f:
+    all_alerts = json.load(f)
+
+def _risk_score(doc):
+    return doc.get('kibana.alert.risk_score', doc.get('event', {}).get('risk_score', 0))
+
+noise_pool  = [doc for doc in all_alerts if int(_risk_score(doc)) % 2 == 1]   # odd  → FP
+attack_pool = [doc for doc in all_alerts if int(_risk_score(doc)) % 2 == 0]   # even → TP
+
+if not noise_pool and not attack_pool:
+    print("ERROR: no docs in fixtures", file=sys.stderr)
+    sys.exit(1)
+
+# ── Date math ────────────────────────────────────────────────────────────
+UNITS = {'s': 1, 'm': 60, 'h': 3600, 'd': 86400, 'w': 604800}
+
+def parse_date_math(expr, now_ms=None):
+    if now_ms is None:
+        now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
+    if expr == 'now':
+        return now_ms
+    m = re.match(r'^(\d+)([smhdw])$', expr)
+    if m:
+        return now_ms - int(m.group(1)) * UNITS[m.group(2)] * 1000
+    m = re.match(r'^now([+-])(\d+)([smhdw])$', expr)
+    if m:
+        sign = 1 if m.group(1) == '+' else -1
+        return now_ms + sign * int(m.group(2)) * UNITS[m.group(3)] * 1000
+    raise ValueError(f"Cannot parse date math: {expr}")
+
+# ── Deterministic helpers ────────────────────────────────────────────────
+HOST_WORDS = ['alpha','bravo','charlie','delta','echo','foxtrot','golf','hotel',
+              'india','juliet','kilo','lima','mike','november','oscar','papa']
+USER_WORDS = ['alice','bob','charlie','diana','eve','frank','grace','henry',
+              'iris','jack','karen','leo','mary','nina','oscar','pete']
+
+def _hash_int(s):
+    return int(hashlib.sha256(s.encode()).hexdigest()[:8], 16)
+
+def gen_name(words, seed, idx):
+    n = _hash_int(f'{seed}:{idx}') % len(words)
+    suffix = (_hash_int(f'{seed}:{idx}:s') % 99) + 1
+    return f"{words[n]}-{suffix}"
+
+# ── Timestamp helpers ────────────────────────────────────────────────────
+def _shift_iso(iso, delta_ms):
+    try:
+        ts = datetime.fromisoformat(iso.replace('Z', '+00:00'))
+        new_ts = ts + timedelta(milliseconds=delta_ms)
+        return new_ts.strftime('%Y-%m-%dT%H:%M:%S.') + f"{new_ts.microsecond // 1000:03d}Z"
+    except Exception:
+        return iso
+
+def _get_nested(d, path):
+    for k in path:
+        if not isinstance(d, dict): return None
+        d = d.get(k)
+    return d
+
+def _set_nested(d, path, val):
+    for k in path[:-1]:
+        d = d.setdefault(k, {})
+    d[path[-1]] = val
+
+NESTED_TS = [['event','created'],['event','ingested'],['event','start'],['event','end']]
+
+def shift_timestamps(doc, delta_ms):
+    if '@timestamp' in doc:
+        doc['@timestamp'] = _shift_iso(doc['@timestamp'], delta_ms)
+    for path in NESTED_TS:
+        v = _get_nested(doc, path)
+        if isinstance(v, str):
+            _set_nested(doc, path, _shift_iso(v, delta_ms))
+    ts = doc.get('@timestamp')
+    if isinstance(ts, str):
+        _set_nested(doc, ['event','created'], ts)
+        _set_nested(doc, ['event','ingested'], _shift_iso(ts, 1000))
+
+def set_host_user(doc, host, user, host_id, agent_id):
+    for path, val in [
+        (['host','name'], host), (['host','hostname'], host), (['host','id'], host_id),
+        (['agent','id'], agent_id), (['elastic','agent','id'], agent_id), (['user','name'], user),
+    ]:
+        _set_nested(doc, path, val)
+
+def doc_ts_ms(doc):
+    return int(datetime.fromisoformat(doc['@timestamp'].replace('Z','+00:00')).timestamp() * 1000)
+
+# ── ES bulk index ────────────────────────────────────────────────────────
+def bulk_index(index, docs):
+    if not docs:
+        return 0
+    lines = []
+    for doc in docs:
+        lines.append(json.dumps({'index': {'_index': index}}))
+        lines.append(json.dumps(doc))
+    body = ('\n'.join(lines) + '\n').encode()
+    creds = base64.b64encode(f"{ES_USER}:{ES_PASS}".encode()).decode()
+    req = urllib.request.Request(
+        ES_URL.rstrip('/') + '/_bulk', data=body,
+        headers={'Authorization': f'Basic {creds}', 'Content-Type': 'application/x-ndjson'},
+        method='POST',
+    )
+    try:
+        with urllib.request.urlopen(req) as resp:
+            result = json.loads(resp.read())
+    except urllib.error.HTTPError as e:
+        result = json.loads(e.read())
+    errs = [i for i in result.get('items', []) if list(i.values())[0].get('error')]
+    if errs:
+        print(f"  warn: {len(errs)} bulk errors in {index}", file=sys.stderr)
+    return len(docs)
+
+# ── Main ─────────────────────────────────────────────────────────────────
+def run():
+    now_ms   = int(datetime.now(timezone.utc).timestamp() * 1000)
+    start_ms = parse_date_math(START_DATE_ARG, now_ms)
+    end_ms   = parse_date_math(END_DATE_ARG, now_ms)
+    if end_ms <= start_ms:
+        end_ms   = now_ms
+        start_ms = now_ms - 86400 * 1000
+
+    range_ms = end_ms - start_ms
+    date_str = datetime.fromtimestamp(end_ms / 1000, tz=timezone.utc).strftime('%Y.%m.%d')
+
+    hosts = [gen_name(HOST_WORDS, 'host', i) for i in range(HOST_COUNT)]
+    users = [gen_name(USER_WORDS, 'user', i) for i in range(USER_COUNT)]
+    risky_hosts = hosts[:max(1, HOST_COUNT // 2)]
+    risky_users = users[:max(1, USER_COUNT // 2)]
+
+    if noise_pool and attack_pool:
+        noise_count  = TARGET_EVENTS // 2
+        attack_count = TARGET_EVENTS - noise_count
+    elif noise_pool:
+        noise_count  = TARGET_EVENTS
+        attack_count = 0
+    else:
+        noise_count  = 0
+        attack_count = TARGET_EVENTS
+
+    print(f"  Fixtures: {FIXTURES_FILE}")
+    print(f"  Noise  alerts (FP, odd risk):  {noise_count}  (pool: {len(noise_pool)} unique)")
+    print(f"  Attack alerts (TP, even risk): {attack_count}  (pool: {len(attack_pool)} unique)")
+    if noise_count and noise_count > len(noise_pool):
+        print(f"  note: {noise_count - len(noise_pool)} noise doc(s) will repeat")
+    if attack_count and attack_count > len(attack_pool):
+        print(f"  note: {attack_count - len(attack_pool)} attack doc(s) will repeat")
+
+    index_buffers = {}
+
+    def place_docs(pool, count, label, use_risky):
+        for i in range(count):
+            doc = copy.deepcopy(pool[i % len(pool)])
+            ts_ms    = start_ms + int(range_ms * i / max(count, 1))
+            delta_ms = ts_ms - doc_ts_ms(doc)
+            shift_timestamps(doc, delta_ms)
+
+            h_pool = risky_hosts if use_risky else hosts
+            u_pool = risky_users if use_risky else users
+            host = h_pool[_hash_int(f'{label}:{i}:h') % len(h_pool)]
+            user = u_pool[_hash_int(f'{label}:{i}:u') % len(u_pool)]
+            set_host_user(doc, host, user,
+                          f"host-{_hash_int(host):016x}",
+                          f"agent-{_hash_int(host+user):016x}")
+
+            index_buffers.setdefault(f"insights-alerts-{label}-{date_str}", []).append(doc)
+
+    if noise_count:
+        place_docs(noise_pool,  noise_count,  'noise',   use_risky=False)
+    if attack_count:
+        place_docs(attack_pool, attack_count, 'attacks', use_risky=True)
+
+    total = 0
+    for index, docs in sorted(index_buffers.items()):
+        n = bulk_index(index, docs)
+        total += n
+        print(f"  Indexed {n} docs into {index}")
+
+    print(f"  Done — {total} total docs indexed")
+
+run()
+PYEOF
+
+echo ""
+echo "  Source data:"
+es_curl "$ES_URL/_cat/indices/insights-alerts-*?h=index,docs.count" 2>/dev/null | grep -v ' 0$' | sed 's/^/    /' || true
+
+# ── Step 5: Update Insights rule lookback + enable + trigger ────────────
+step "5/5  Updating Insights rule lookback ($LOOKBACK) and triggering"
+
+python3 -c "
+import json, subprocess
+payload = {'id': '$INSIGHTS_RULE_ID', 'enabled': True, 'from': '$LOOKBACK'}
+r = subprocess.run([
+    'curl', '-s', '-X', 'PATCH',
+    '$KIBANA_URL/api/detection_engine/rules',
+    '-H', 'kbn-xsrf: true',
+    '-H', 'elastic-api-version: 2023-10-31',
+    '-H', 'x-elastic-internal-origin: kibana',
+    '-H', 'Content-Type: application/json',
+    '-u', '$KIBANA_AUTH',
+    '-d', json.dumps(payload)
+], capture_output=True, text=True)
+d = json.loads(r.stdout)
+print(f\"  enabled={d.get('enabled')} from={d.get('from')}\")
+"
+
+kibana_curl -X POST "$KIBANA_URL/internal/alerting/rule/$INSIGHTS_RULE_ID/_run_soon" > /dev/null 2>&1 || true
+echo "  Triggered rule, waiting ${WAIT_SECS}s for execution..."
+sleep "$WAIT_SECS"
+
+alert_count=$(es_curl "$ES_URL/.alerts-security.alerts-default/_count" 2>/dev/null \
+  | python3 -c "import sys,json; print(json.load(sys.stdin).get('count',0))" 2>/dev/null || echo "0")
+
+echo ""
+echo "━━━ Done ━━━"
+echo "  Security alerts created: $alert_count"
+echo "  Workflow action: $WORKFLOW_ID"
+echo "  Episodes: $EPISODES"

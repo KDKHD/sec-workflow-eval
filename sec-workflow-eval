@@ -1,0 +1,349 @@
+#!/usr/bin/env bash
+# sec-workflow-eval — Run sec-workflow-alerts then poll until the workflow
+# classifies every alert, and report TP/FP accuracy.
+#
+# Usage:
+#   sec-workflow-eval [OPTIONS] [-- sec-workflow-alerts OPTIONS...]
+#
+# Options:
+#   --timeout SECS     Polling timeout in seconds (default: 600)
+#   --poll SECS        Polling interval in seconds (default: 10)
+#   --skip-run         Skip running sec-workflow-alerts; evaluate current state
+#   --kibana-url URL   Override Kibana URL (or set KIBANA_URL env var)
+#   --auth USER:PASS   Override auth (or set KIBANA_AUTH env var)
+#   -h, --help         Show this help
+#
+# Accuracy contract:
+#   odd  kibana.alert.risk_score  →  expected false positive
+#   even kibana.alert.risk_score  →  expected true positive
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+
+KIBANA_URL="${KIBANA_URL:-}"
+KIBANA_AUTH="${KIBANA_AUTH:-}"
+TIMEOUT_SECS=600
+POLL_SECS=10
+SKIP_RUN=false
+FORWARD_ARGS=()
+
+usage() {
+  sed -n '2,/^set -/p' "$0" | grep '^#' | sed 's/^# \{0,1\}//'
+}
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --timeout)    TIMEOUT_SECS="$2"; shift 2 ;;
+    --poll)       POLL_SECS="$2";    shift 2 ;;
+    --skip-run)   SKIP_RUN=true;     shift ;;
+    --kibana-url) KIBANA_URL="$2";   shift 2 ;;
+    --auth)       KIBANA_AUTH="$2";  shift 2 ;;
+    -h|--help)    usage; exit 0 ;;
+    --)           shift; FORWARD_ARGS+=("$@"); break ;;
+    *)            FORWARD_ARGS+=("$1"); shift ;;
+  esac
+done
+
+# ── Kibana / ES detection (same logic as sec-workflow-alerts) ────────────────
+_try_kibana() {
+  local url="$1" auth="$2" http_code
+  http_code="$(curl -s -o /dev/null -w "%{http_code}" -k "$url/api/status" 2>/dev/null || echo "000")"
+  [[ "$http_code" == "000" ]] && return 1
+  http_code="$(curl -s -o /dev/null -w "%{http_code}" -k -u "$auth" \
+    -H "kbn-xsrf: true" -H "x-elastic-internal-origin: Kibana" \
+    "$url/api/data_sources" 2>/dev/null || echo "000")"
+  [[ "$http_code" != "000" && "$http_code" != "401" ]]
+}
+
+detect_kibana() {
+  local _URLS=("http://localhost:5601" "https://localhost:5601")
+  local _AUTHS=("elastic:changeme" "elastic_serverless:changeme")
+
+  if [[ -n "$KIBANA_URL" && -n "$KIBANA_AUTH" ]]; then
+    _try_kibana "$KIBANA_URL" "$KIBANA_AUTH" && return 0
+    KIBANA_URL="" KIBANA_AUTH=""
+  fi
+
+  if [[ -n "$KIBANA_URL" ]]; then
+    for auth in "${_AUTHS[@]}"; do
+      if _try_kibana "$KIBANA_URL" "$auth"; then
+        KIBANA_AUTH="$auth"; return 0
+      fi
+    done
+    echo "Error: Kibana at $KIBANA_URL did not respond with any known credentials." >&2
+    return 1
+  fi
+
+  for url in "${_URLS[@]}"; do
+    for auth in "${_AUTHS[@]}"; do
+      if _try_kibana "$url" "$auth"; then
+        KIBANA_URL="$url" KIBANA_AUTH="$auth"
+        echo "Detected Kibana at $KIBANA_URL (auth: ${auth%%:*})" >&2
+        return 0
+      fi
+    done
+  done
+
+  echo "Error: Could not detect a running Kibana instance." >&2
+  return 1
+}
+
+detect_kibana
+ES_URL="${KIBANA_URL/5601/9200}"
+
+# ── Step 1: Run sec-workflow-alerts ─────────────────────────────────────────
+if [[ "$SKIP_RUN" == "false" ]]; then
+  echo ""
+  echo "━━━ Running sec-workflow-alerts ━━━"
+  echo ""
+  KIBANA_URL="$KIBANA_URL" KIBANA_AUTH="$KIBANA_AUTH" \
+    "$SCRIPT_DIR/sec-workflow-alerts" "${FORWARD_ARGS[@]+"${FORWARD_ARGS[@]}"}"
+fi
+
+# ── Step 2: Poll + Step 3: Report ───────────────────────────────────────────
+_SEC_ES_URL="$ES_URL" \
+_SEC_KIBANA_AUTH="$KIBANA_AUTH" \
+_SEC_TIMEOUT="$TIMEOUT_SECS" \
+_SEC_POLL="$POLL_SECS" \
+python3 - <<'PYEOF'
+import json, os, sys, time, base64
+import urllib.request, urllib.error
+from datetime import datetime, timezone
+
+ES_URL      = os.environ['_SEC_ES_URL']
+AUTH        = os.environ['_SEC_KIBANA_AUTH']
+TIMEOUT     = int(os.environ.get('_SEC_TIMEOUT', '600'))
+POLL        = int(os.environ.get('_SEC_POLL', '10'))
+ES_USER, ES_PASS = AUTH.split(':', 1)
+
+WORKFLOW_NAME   = 'security.alert.validation'
+TAG_PREFIX      = f'workflow.{WORKFLOW_NAME}'
+TAG_TP          = f'{TAG_PREFIX}.output.classification.true_positive'
+TAG_FP          = f'{TAG_PREFIX}.output.classification.false_positive'
+TAG_INC         = f'{TAG_PREFIX}.output.classification.inconclusive'
+TAG_CONF_PREFIX = f'{TAG_PREFIX}.output.confidence_score.'
+
+# ANSI colour helpers
+GREEN  = '\033[32m'
+RED    = '\033[31m'
+YELLOW = '\033[33m'
+BOLD   = '\033[1m'
+DIM    = '\033[2m'
+RESET  = '\033[0m'
+
+def cprint(color, text, end='\n'):
+    print(f'{color}{text}{RESET}', end=end, flush=True)
+
+def es_post(path, body):
+    creds = base64.b64encode(f'{ES_USER}:{ES_PASS}'.encode()).decode()
+    req = urllib.request.Request(
+        ES_URL.rstrip('/') + path,
+        data=json.dumps(body).encode(),
+        headers={'Authorization': f'Basic {creds}', 'Content-Type': 'application/json'},
+        method='POST',
+    )
+    try:
+        with urllib.request.urlopen(req) as r:
+            return json.loads(r.read())
+    except urllib.error.HTTPError as e:
+        return json.loads(e.read())
+
+def fetch_alerts():
+    return es_post('/.alerts-security.alerts-default/_search', {
+        'size': 200,
+        '_source': True,
+        'query': {'match_all': {}},
+        'sort': [{'@timestamp': {'order': 'asc'}}],
+    })
+
+def _nested(src, *path):
+    """Traverse a nested dict safely, e.g. _nested(src, 'process', 'name')."""
+    d = src
+    for k in path:
+        if not isinstance(d, dict):
+            return None
+        d = d.get(k)
+    return d or None
+
+def tags_of(src):
+    return src.get('kibana.alert.workflow_tags') or []
+
+def workflow_classification(tags):
+    if TAG_TP  in tags: return 'true_positive'
+    if TAG_FP  in tags: return 'false_positive'
+    if TAG_INC in tags: return 'inconclusive'
+    if any(t.startswith(TAG_PREFIX) for t in tags): return 'inconclusive'
+    return 'pending'
+
+def confidence_score(tags):
+    for t in tags:
+        if t.startswith(TAG_CONF_PREFIX):
+            return t[len(TAG_CONF_PREFIX):]
+    return '?'
+
+def expected_class(risk_score):
+    try:
+        return 'FP' if int(risk_score) % 2 == 1 else 'TP'
+    except (TypeError, ValueError):
+        return '?'
+
+def all_classified(hits):
+    return (
+        bool(hits) and
+        all(workflow_classification(tags_of(h['_source'])) != 'pending' for h in hits)
+    )
+
+# ── Poll ─────────────────────────────────────────────────────────────────────
+print()
+cprint(BOLD, '━━━ Waiting for workflow classification ━━━')
+print(f'    timeout={TIMEOUT}s  poll={POLL}s  tag-prefix={TAG_PREFIX}')
+print()
+
+deadline = time.time() + TIMEOUT
+start    = time.time()
+hits     = []
+timed_out = False
+
+while time.time() < deadline:
+    result = fetch_alerts()
+    hits   = result.get('hits', {}).get('hits', [])
+    total  = len(hits)
+    done   = sum(
+        1 for h in hits
+        if workflow_classification(tags_of(h['_source'])) != 'pending'
+    )
+    elapsed = int(time.time() - start)
+    status  = '✓ all classified' if (total and all_classified(hits)) else '⏳ waiting…'
+    print(f'  [{elapsed:4d}s]  alerts={total:3d}  classified={done:3d}/{total:<3d}  {status}',
+          end='\r', flush=True)
+
+    if total and all_classified(hits):
+        print()
+        break
+    time.sleep(POLL)
+else:
+    timed_out = True
+    print()
+    cprint(YELLOW, f'  ⚠  Timeout after {TIMEOUT}s — showing partial results')
+
+# ── Build result rows ─────────────────────────────────────────────────────────
+rows = []
+for h in hits:
+    src   = h['_source']
+    tags  = tags_of(src)
+    aid   = h.get('_id', '?')
+    risk  = src.get('kibana.alert.risk_score')
+    rule  = src.get('kibana.alert.rule.name') or src.get('rule.name') or src.get('message', '?')
+    proc  = _nested(src, 'process', 'name') or ''
+    cmd   = _nested(src, 'process', 'command_line') or ''
+    host  = _nested(src, 'host', 'name') or src.get('host.name', '')
+    user  = _nested(src, 'user', 'name') or src.get('user.name', '')
+    exp   = expected_class(risk)
+    actual = workflow_classification(tags)
+    conf  = confidence_score(tags)
+
+    correct = (
+        (exp == 'FP' and actual == 'false_positive') or
+        (exp == 'TP' and actual == 'true_positive')
+    )
+    rows.append({
+        'exp': exp, 'actual': actual, 'correct': correct,
+        'risk': risk, 'rule': rule, 'proc': proc, 'cmd': cmd,
+        'host': host, 'user': user, 'conf': conf, 'id': aid,
+    })
+
+# ── Results table ─────────────────────────────────────────────────────────────
+print()
+cprint(BOLD, '━━━ Per-Alert Classification Results ━━━')
+print()
+
+H_EXP    = 'Expected'
+H_ACTUAL = 'Classified as'
+H_OK     = ' '
+H_RISK   = 'Risk'
+H_CONF   = 'Conf'
+H_PROC   = 'Process'
+H_RULE   = 'Rule'
+H_ID     = 'Alert ID'
+print(f'  {H_EXP:8s}  {H_ACTUAL:15s}  {H_OK}  {H_RISK:4s}  {H_CONF:6s}  {H_PROC:16s}  {H_RULE:55s}  {H_ID}')
+print(f'  {"─"*8}  {"─"*15}  {"─"}  {"─"*4}  {"─"*6}  {"─"*16}  {"─"*55}  {"─"*32}')
+
+for r in rows:
+    icon  = '✓' if r['correct'] else '✗'
+    color = GREEN if r['correct'] else RED
+    act   = r['actual'][:15]
+    exp   = r['exp']
+    risk  = str(r['risk']) if r['risk'] is not None else '?'
+    conf  = r['conf'][:6]
+    proc  = (r['proc'] or r['user'] or '?')[:16]
+    rule  = r['rule'][:55]
+    aid   = r['id']
+    cprint(color, f'  {exp:8s}  {act:15s}  {icon}  {risk:4s}  {conf:6s}  {proc:16s}  {rule:55s}  {aid}')
+
+# ── Accuracy summary ──────────────────────────────────────────────────────────
+tp_exp = [r for r in rows if r['exp'] == 'TP']
+fp_exp = [r for r in rows if r['exp'] == 'FP']
+
+tp_correct    = sum(1 for r in tp_exp if r['correct'])
+fp_correct    = sum(1 for r in fp_exp if r['correct'])
+fp_as_tp      = sum(1 for r in fp_exp if r['actual'] == 'true_positive')
+tp_as_fp      = sum(1 for r in tp_exp if r['actual'] == 'false_positive')
+inconclusive  = sum(1 for r in rows  if r['actual'] == 'inconclusive')
+pending       = sum(1 for r in rows  if r['actual'] == 'pending')
+total         = len(rows)
+total_correct = tp_correct + fp_correct
+
+def pct(num, den):
+    return f'{int(num / den * 100):3d}%' if den else '  ?%'
+
+print()
+cprint(BOLD, '━━━ Accuracy Summary ━━━')
+print()
+print(f'  Total alerts:          {total}')
+print(f'  Expected TPs:          {len(tp_exp)}  (even risk score)')
+print(f'  Expected FPs:          {len(fp_exp)}  (odd risk score)')
+print()
+
+overall_color = GREEN if total_correct == total else (YELLOW if total_correct >= total * 0.8 else RED)
+cprint(overall_color, f'  Overall accuracy:      {total_correct}/{total}  ({pct(total_correct, total)})')
+
+tp_color = GREEN if tp_correct == len(tp_exp) else (YELLOW if tp_correct >= len(tp_exp) * 0.8 else RED)
+cprint(tp_color, f'  TP detection rate:     {tp_correct}/{len(tp_exp)}  ({pct(tp_correct, len(tp_exp))})')
+
+fp_color = GREEN if fp_correct == len(fp_exp) else (YELLOW if fp_correct >= len(fp_exp) * 0.8 else RED)
+cprint(fp_color, f'  FP detection rate:     {fp_correct}/{len(fp_exp)}  ({pct(fp_correct, len(fp_exp))})')
+
+print()
+cprint(BOLD, '  Confusion matrix:')
+print(f'                        Classified TP   Classified FP   Inconclusive')
+print(f'  {"─"*65}')
+print(f'  Actual TP ({len(tp_exp):2d}):          '
+      f'{tp_correct:5d}           {tp_as_fp:5d}          {sum(1 for r in tp_exp if r["actual"] == "inconclusive"):5d}')
+print(f'  Actual FP ({len(fp_exp):2d}):          '
+      f'{fp_as_tp:5d}           {fp_correct:5d}          {sum(1 for r in fp_exp if r["actual"] == "inconclusive"):5d}')
+
+if inconclusive:
+    print()
+    cprint(YELLOW, f'  ⚠  {inconclusive} alert(s) returned inconclusive')
+if pending:
+    print()
+    cprint(YELLOW, f'  ⚠  {pending} alert(s) still pending (timed out before classification)')
+
+# ── Misclassified detail ───────────────────────────────────────────────────────
+wrong = [r for r in rows if not r['correct'] and r['actual'] not in ('pending', 'inconclusive')]
+if wrong:
+    print()
+    cprint(BOLD, '  Misclassifications:')
+    for r in wrong:
+        label = 'FP called TP' if r['exp'] == 'FP' else 'TP called FP'
+        cprint(RED,    f'    [{label}]  risk={r["risk"]}  proc={r["proc"] or "?"}  user={r["user"] or "?"}')
+        cprint(YELLOW, f'      cmd : {r["cmd"][:100] or "<no command_line>"}')
+        cprint(DIM,    f'      rule: {r["rule"][:90]}')
+
+print()
+if timed_out:
+    sys.exit(2)
+if pending:
+    sys.exit(2)
+PYEOF
