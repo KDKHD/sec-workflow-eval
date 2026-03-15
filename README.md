@@ -104,6 +104,9 @@ Options:
 
 # Shorter timeout, faster polling
 ./sec-workflow-eval --timeout 120 --poll 5
+
+# Custom path for fixtures
+./sec-workflow-eval -- --fixtures /path/to/fixtures.json
 ```
 
 ## Fixtures
