@@ -10,6 +10,7 @@
 #   --poll SECS        Polling interval in seconds (default: 10)
 #   --skip-run         Skip running sec-workflow-alerts; evaluate current state
 #   --kibana-url URL   Override Kibana URL (or set KIBANA_URL env var)
+#   --es-url URL       Override Elasticsearch URL (or set ES_URL env var)
 #   --auth USER:PASS   Override auth (or set KIBANA_AUTH env var)
 #   -h, --help         Show this help
 #
@@ -23,6 +24,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 KIBANA_URL="${KIBANA_URL:-}"
 KIBANA_AUTH="${KIBANA_AUTH:-}"
+ES_URL="${ES_URL:-}"
 TIMEOUT_SECS=600
 POLL_SECS=10
 SKIP_RUN=false
@@ -38,6 +40,7 @@ while [[ $# -gt 0 ]]; do
     --poll)       POLL_SECS="$2";    shift 2 ;;
     --skip-run)   SKIP_RUN=true;     shift ;;
     --kibana-url) KIBANA_URL="$2";   shift 2 ;;
+    --es-url)     ES_URL="$2";      shift 2 ;;
     --auth)       KIBANA_AUTH="$2";  shift 2 ;;
     -h|--help)    usage; exit 0 ;;
     --)           shift; FORWARD_ARGS+=("$@"); break ;;
@@ -90,14 +93,14 @@ detect_kibana() {
 }
 
 detect_kibana
-ES_URL="${KIBANA_URL/5601/9200}"
+ES_URL="${ES_URL:-${KIBANA_URL/5601/9200}}"
 
 # ── Step 1: Run sec-workflow-alerts ─────────────────────────────────────────
 if [[ "$SKIP_RUN" == "false" ]]; then
   echo ""
   echo "━━━ Running sec-workflow-alerts ━━━"
   echo ""
-  KIBANA_URL="$KIBANA_URL" KIBANA_AUTH="$KIBANA_AUTH" \
+  KIBANA_URL="$KIBANA_URL" KIBANA_AUTH="$KIBANA_AUTH" ES_URL="$ES_URL" \
     "$SCRIPT_DIR/sec-workflow-alerts" "${FORWARD_ARGS[@]+"${FORWARD_ARGS[@]}"}"
 fi
 
@@ -107,9 +110,13 @@ _SEC_KIBANA_AUTH="$KIBANA_AUTH" \
 _SEC_TIMEOUT="$TIMEOUT_SECS" \
 _SEC_POLL="$POLL_SECS" \
 python3 - <<'PYEOF'
-import json, os, sys, time, base64
+import json, os, sys, time, base64, ssl
 import urllib.request, urllib.error
 from datetime import datetime, timezone
+
+_SSL_CTX = ssl.create_default_context()
+_SSL_CTX.check_hostname = False
+_SSL_CTX.verify_mode = ssl.CERT_NONE
 
 ES_URL      = os.environ['_SEC_ES_URL']
 AUTH        = os.environ['_SEC_KIBANA_AUTH']
@@ -144,7 +151,7 @@ def es_post(path, body):
         method='POST',
     )
     try:
-        with urllib.request.urlopen(req) as r:
+        with urllib.request.urlopen(req, context=_SSL_CTX) as r:
             return json.loads(r.read())
     except urllib.error.HTTPError as e:
         return json.loads(e.read())

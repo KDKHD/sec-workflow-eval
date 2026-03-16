@@ -36,6 +36,7 @@ Options:
   --lookback EXPR         Rule lookback expression (default: $LOOKBACK)
   --wait SECS             Seconds to wait for rule execution (default: $WAIT_SECS)
   --fixtures FILE         Path to alerts JSON file (default: fixtures/alerts.json)
+  --es-url URL            Override Elasticsearch URL (or set ES_URL env var)
   --help                  Show this help
 EOF
   exit 0
@@ -53,6 +54,7 @@ while [[ $# -gt 0 ]]; do
     --lookback)    LOOKBACK="$2"; shift 2 ;;
     --wait)        WAIT_SECS="$2"; shift 2 ;;
     --fixtures)    FIXTURES_FILE="$2"; shift 2 ;;
+    --es-url)      ES_URL="$2"; shift 2 ;;
     -h|--help)     usage ;;
     *) echo "Unknown option: $1"; usage ;;
   esac
@@ -117,10 +119,12 @@ kibana_curl() {
 }
 
 detect_kibana
-ES_URL="${KIBANA_URL/5601/9200}"
+ES_URL="${ES_URL:-${KIBANA_URL/5601/9200}}"
 
 es_curl() {
-  curl -s -u "$KIBANA_AUTH" "$@"
+  local tls_flag=""
+  [[ "$ES_URL" == https://* ]] && tls_flag="-k"
+  curl -s $tls_flag -u "$KIBANA_AUTH" "$@"
 }
 
 step() {
@@ -228,10 +232,14 @@ _SEC_HOSTS="$HOSTS" \
 _SEC_USERS="$USERS" \
 _SEC_FIXTURES_FILE="$FIXTURES_FILE" \
 python3 - <<'PYEOF'
-import json, sys, hashlib, copy, os, base64
+import json, sys, hashlib, copy, os, base64, ssl
 import urllib.request, urllib.error
 from datetime import datetime, timezone, timedelta
 import re
+
+_SSL_CTX = ssl.create_default_context()
+_SSL_CTX.check_hostname = False
+_SSL_CTX.verify_mode = ssl.CERT_NONE
 
 # ── Connection ───────────────────────────────────────────────────────────
 ES_URL         = os.environ['_SEC_ES_URL']
@@ -357,7 +365,7 @@ def bulk_index(index, docs):
         method='POST',
     )
     try:
-        with urllib.request.urlopen(req) as resp:
+        with urllib.request.urlopen(req, context=_SSL_CTX) as resp:
             result = json.loads(resp.read())
     except urllib.error.HTTPError as e:
         result = json.loads(e.read())
