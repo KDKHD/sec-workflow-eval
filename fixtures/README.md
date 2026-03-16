@@ -36,4 +36,4 @@ Example structure:
 ]
 ```
 
-This file is git-ignored. Obtain the real fixtures from your team.
+This file is a sample of made up alerts - get fixtures with real alerts from your team.
