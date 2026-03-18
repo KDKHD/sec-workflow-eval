@@ -15,6 +15,7 @@ LOOKBACK="now-2d"
 INSIGHTS_RULE_ID_STATIC="61e90241-c8f2-47bc-8e47-238420a34fb6"
 WAIT_SECS=20
 FIXTURES_FILE="$SCRIPT_DIR/fixtures/alerts.json"
+SKIP_DELETE=false
 
 usage() {
   cat <<EOF
@@ -36,6 +37,7 @@ Options:
   --lookback EXPR         Rule lookback expression (default: $LOOKBACK)
   --wait SECS             Seconds to wait for rule execution (default: $WAIT_SECS)
   --fixtures FILE         Path to alerts JSON file (default: fixtures/alerts.json)
+  --skip-delete           Skip deleting existing alerts before indexing
   --es-url URL            Override Elasticsearch URL (or set ES_URL env var)
   --help                  Show this help
 EOF
@@ -54,6 +56,7 @@ while [[ $# -gt 0 ]]; do
     --lookback)    LOOKBACK="$2"; shift 2 ;;
     --wait)        WAIT_SECS="$2"; shift 2 ;;
     --fixtures)    FIXTURES_FILE="$2"; shift 2 ;;
+    --skip-delete) SKIP_DELETE=true; shift ;;
     --es-url)      ES_URL="$2"; shift 2 ;;
     -h|--help)     usage ;;
     *) echo "Unknown option: $1"; usage ;;
@@ -135,18 +138,22 @@ step() {
 # ── Step 1: Delete all security alerts ──────────────────────────────────
 step "1/5  Deleting existing security alerts"
 
-deleted=$(es_curl -X POST "$ES_URL/.alerts-security.alerts-default/_delete_by_query" \
-  -H "Content-Type: application/json" \
-  -d '{"query":{"match_all":{}}}' 2>/dev/null \
-  | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('deleted',0))" 2>/dev/null || echo "0")
-echo "  Deleted $deleted alert(s)"
-
-ALL_INDICES=$(es_curl "$ES_URL/_cat/indices/insights-alerts-*,logs-endpoint.*?h=index" 2>/dev/null | tr '\n' ',' | sed 's/,$//' || true)
-if [[ -n "$ALL_INDICES" && "$ALL_INDICES" != *"error"* ]]; then
-  es_curl -X DELETE "$ES_URL/$ALL_INDICES" > /dev/null 2>&1 || true
-  echo "  Deleted episode indices"
+if [[ "$SKIP_DELETE" == "true" ]]; then
+  echo "  Skipped (--skip-delete)"
 else
-  echo "  No episode indices to delete"
+  deleted=$(es_curl -X POST "$ES_URL/.alerts-security.alerts-default/_delete_by_query" \
+    -H "Content-Type: application/json" \
+    -d '{"query":{"match_all":{}}}' 2>/dev/null \
+    | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('deleted',0))" 2>/dev/null || echo "0")
+  echo "  Deleted $deleted alert(s)"
+
+  ALL_INDICES=$(es_curl "$ES_URL/_cat/indices/insights-alerts-*,logs-endpoint.*?h=index" 2>/dev/null | tr '\n' ',' | sed 's/,$//' || true)
+  if [[ -n "$ALL_INDICES" && "$ALL_INDICES" != *"error"* ]]; then
+    es_curl -X DELETE "$ES_URL/$ALL_INDICES" > /dev/null 2>&1 || true
+    echo "  Deleted episode indices"
+  else
+    echo "  No episode indices to delete"
+  fi
 fi
 
 # ── Step 2: Ensure Insights rule exists ─────────────────────────────────

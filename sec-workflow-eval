@@ -10,6 +10,9 @@
 #   --poll SECS        Polling interval in seconds (default: 10)
 #   --skip-run         Skip running sec-workflow-alerts; evaluate current state
 #   --kibana-url URL   Override Kibana URL (or set KIBANA_URL env var)
+#
+# Flags forwarded to sec-workflow-alerts (after --):
+#   --skip-delete      Skip deleting existing alerts before indexing
 #   --es-url URL       Override Elasticsearch URL (or set ES_URL env var)
 #   --auth USER:PASS   Override auth (or set KIBANA_AUTH env var)
 #   -h, --help         Show this help
