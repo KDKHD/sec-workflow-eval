@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+trap 'echo "" >&2; echo "ERROR: command failed at line $LINENO: $BASH_COMMAND" >&2' ERR
+
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 # ── Defaults (override via flags or env vars) ───────────────────────────
@@ -174,9 +176,13 @@ if [[ "$rule_count" == "0" ]]; then
   echo "  Importing Insights rule..."
   import_result=$(kibana_curl -X POST "$KIBANA_URL/api/detection_engine/rules/_import" \
     -H "elastic-api-version: 2023-10-31" \
-    -F "file=@$NDJSON_TMPFILE")
-  success=$(echo "$import_result" | python3 -c "import sys,json; print(json.load(sys.stdin).get('success_count',0))" 2>/dev/null)
-  echo "  Imported: $success rule(s)"
+    -F "file=@$NDJSON_TMPFILE" || true)
+  success=$(echo "$import_result" | python3 -c "import sys,json; print(json.load(sys.stdin).get('success_count',0))" 2>/dev/null || echo "0")
+  if [[ "$success" == "0" ]]; then
+    echo "  Import returned 0 successes — response: $import_result" >&2
+  else
+    echo "  Imported: $success rule(s)"
+  fi
 else
   echo "  Insights rule already exists"
 fi
@@ -187,45 +193,16 @@ INSIGHTS_RULE_ID=$(kibana_curl -X GET "$KIBANA_URL/api/detection_engine/rules/_f
 INSIGHTS_RULE_ID="${INSIGHTS_RULE_ID:-$INSIGHTS_RULE_ID_STATIC}"
 echo "  Insights rule ID: $INSIGHTS_RULE_ID"
 
-# ── Step 3: Set workflow action on all rules ────────────────────────────
-step "3/5  Setting workflow action on all rules"
+# ── Step 3: Attach Insights rule to the managed workflow ────────────────
+step "3/5  Attaching Insights rule to the managed workflow"
 
-bulk_result=$(python3 -c "
-import json, subprocess
-payload = {
-    'action': 'edit',
-    'query': '',
-    'edit': [{
-        'type': 'set_rule_actions',
-        'value': {
-            'actions': [{
-                'id': 'system-connector-.workflows',
-                'params': {
-                    'subAction': 'run',
-                    'subActionParams': {
-                        'workflowId': '$WORKFLOW_ID',
-                        'summaryMode': False
-                    }
-                }
-            }]
-        }
-    }]
-}
-r = subprocess.run([
-    'curl', '-s', '-X', 'POST',
-    '$KIBANA_URL/api/detection_engine/rules/_bulk_action',
-    '-H', 'kbn-xsrf: true',
-    '-H', 'elastic-api-version: 2023-10-31',
-    '-H', 'x-elastic-internal-origin: kibana',
-    '-H', 'Content-Type: application/json',
-    '-u', '$KIBANA_AUTH',
-    '-d', json.dumps(payload)
-], capture_output=True, text=True)
-d = json.loads(r.stdout)
-s = d.get('attributes', {}).get('summary', {})
-print(f\"succeeded={s.get('succeeded',0)} failed={s.get('failed',0)}\")
-")
-echo "  Workflow action: $bulk_result"
+attach_result=$(kibana_curl -s -X POST \
+  "$KIBANA_URL/internal/security_solution/alert_validation_workflow/rules/_update" \
+  -H "elastic-api-version: 1" \
+  -H "Content-Type: application/json" \
+  -d "{\"attachRuleIds\":[\"$INSIGHTS_RULE_ID\"],\"detachRuleIds\":[]}")
+updated=$(echo "$attach_result" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('updated',0))" 2>/dev/null || echo "?")
+echo "  Attached: $updated rule(s)"
 
 # ── Step 4: Index alerts from fixtures file ─────────────────────────────
 step "4/5  Indexing alerts (50% noise / 50% attack, N=$EVENTS, fixtures=$(basename "$FIXTURES_FILE"))"
@@ -235,8 +212,6 @@ _SEC_KIBANA_AUTH="$KIBANA_AUTH" \
 _SEC_START_DATE="$START_DATE" \
 _SEC_END_DATE="$END_DATE" \
 _SEC_EVENTS="$EVENTS" \
-_SEC_HOSTS="$HOSTS" \
-_SEC_USERS="$USERS" \
 _SEC_FIXTURES_FILE="$FIXTURES_FILE" \
 python3 - <<'PYEOF'
 import json, sys, hashlib, copy, os, base64, ssl
@@ -255,8 +230,6 @@ ES_USER, ES_PASS = KIBANA_AUTH.split(':', 1)
 START_DATE_ARG = os.environ['_SEC_START_DATE']
 END_DATE_ARG   = os.environ['_SEC_END_DATE']
 TARGET_EVENTS  = int(os.environ['_SEC_EVENTS'])
-HOST_COUNT     = int(os.environ['_SEC_HOSTS'])
-USER_COUNT     = int(os.environ['_SEC_USERS'])
 FIXTURES_FILE  = os.environ['_SEC_FIXTURES_FILE']
 
 # ── Load fixtures ────────────────────────────────────────────────────────
@@ -298,20 +271,6 @@ def parse_date_math(expr, now_ms=None):
         return now_ms + sign * int(m.group(2)) * UNITS[m.group(3)] * 1000
     raise ValueError(f"Cannot parse date math: {expr}")
 
-# ── Deterministic helpers ────────────────────────────────────────────────
-HOST_WORDS = ['alpha','bravo','charlie','delta','echo','foxtrot','golf','hotel',
-              'india','juliet','kilo','lima','mike','november','oscar','papa']
-USER_WORDS = ['alice','bob','charlie','diana','eve','frank','grace','henry',
-              'iris','jack','karen','leo','mary','nina','oscar','pete']
-
-def _hash_int(s):
-    return int(hashlib.sha256(s.encode()).hexdigest()[:8], 16)
-
-def gen_name(words, seed, idx):
-    n = _hash_int(f'{seed}:{idx}') % len(words)
-    suffix = (_hash_int(f'{seed}:{idx}:s') % 99) + 1
-    return f"{words[n]}-{suffix}"
-
 # ── Timestamp helpers ────────────────────────────────────────────────────
 def _shift_iso(iso, delta_ms):
     try:
@@ -345,13 +304,6 @@ def shift_timestamps(doc, delta_ms):
     if isinstance(ts, str):
         _set_nested(doc, ['event','created'], ts)
         _set_nested(doc, ['event','ingested'], _shift_iso(ts, 1000))
-
-def set_host_user(doc, host, user, host_id, agent_id):
-    for path, val in [
-        (['host','name'], host), (['host','hostname'], host), (['host','id'], host_id),
-        (['agent','id'], agent_id), (['elastic','agent','id'], agent_id), (['user','name'], user),
-    ]:
-        _set_nested(doc, path, val)
 
 def doc_ts_ms(doc):
     return int(datetime.fromisoformat(doc['@timestamp'].replace('Z','+00:00')).timestamp() * 1000)
@@ -393,11 +345,6 @@ def run():
     range_ms = end_ms - start_ms
     date_str = datetime.fromtimestamp(end_ms / 1000, tz=timezone.utc).strftime('%Y.%m.%d')
 
-    hosts = [gen_name(HOST_WORDS, 'host', i) for i in range(HOST_COUNT)]
-    users = [gen_name(USER_WORDS, 'user', i) for i in range(USER_COUNT)]
-    risky_hosts = hosts[:max(1, HOST_COUNT // 2)]
-    risky_users = users[:max(1, USER_COUNT // 2)]
-
     if noise_pool and attack_pool:
         noise_count  = TARGET_EVENTS // 2
         attack_count = TARGET_EVENTS - noise_count
@@ -418,27 +365,20 @@ def run():
 
     index_buffers = {}
 
-    def place_docs(pool, count, label, use_risky):
+    def place_docs(pool, count, label):
         for i in range(count):
             doc = copy.deepcopy(pool[i % len(pool)])
             ts_ms    = start_ms + int(range_ms * i / max(count, 1))
             delta_ms = ts_ms - doc_ts_ms(doc)
             shift_timestamps(doc, delta_ms)
-
-            h_pool = risky_hosts if use_risky else hosts
-            u_pool = risky_users if use_risky else users
-            host = h_pool[_hash_int(f'{label}:{i}:h') % len(h_pool)]
-            user = u_pool[_hash_int(f'{label}:{i}:u') % len(u_pool)]
-            set_host_user(doc, host, user,
-                          f"host-{_hash_int(host):016x}",
-                          f"agent-{_hash_int(host+user):016x}")
+            # Preserve host/user from fixtures (no override)
 
             index_buffers.setdefault(f"insights-alerts-{label}-{date_str}", []).append(doc)
 
     if noise_count:
-        place_docs(noise_pool,  noise_count,  'noise',   use_risky=False)
+        place_docs(noise_pool,  noise_count,  'noise')
     if attack_count:
-        place_docs(attack_pool, attack_count, 'attacks', use_risky=True)
+        place_docs(attack_pool, attack_count, 'attacks')
 
     total = 0
     for index, docs in sorted(index_buffers.items()):

@@ -127,7 +127,7 @@ TIMEOUT     = int(os.environ.get('_SEC_TIMEOUT', '600'))
 POLL        = int(os.environ.get('_SEC_POLL', '10'))
 ES_USER, ES_PASS = AUTH.split(':', 1)
 
-WORKFLOW_NAME   = 'security.alert.validation'
+WORKFLOW_NAME   = 'security.alert.analysis'
 TAG_PREFIX      = f'workflow.{WORKFLOW_NAME}'
 TAG_TP          = f'{TAG_PREFIX}.output.classification.true_positive'
 TAG_FP          = f'{TAG_PREFIX}.output.classification.false_positive'

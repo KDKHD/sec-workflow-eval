@@ -15,7 +15,8 @@ You can run them independently or together.
 - **bash** (4.x+)
 - **curl**
 - **python3** (3.8+, stdlib only — no pip install needed)
-- A running **Kibana + Elasticsearch** instance (local dev or cloud)
+- A running **Kibana + Elasticsearch** instance with the Alert Analysis workflow
+  enabled (`Security → Rules → Alert Analysis Workflow`)
 
 ## Quick start
 
@@ -25,7 +26,11 @@ git clone <repo-url> && cd sec-workflow-eval
 # Add your fixtures (not included in the repo — get them from your team)
 cp /path/to/your/alerts.json fixtures/alerts.json
 
-# Run the full eval (auto-detects local Kibana at localhost:5601)
+# Set connection vars (required — auto-detection only works for default port 5601)
+export KIBANA_URL=http://localhost:9720
+export ES_URL=http://localhost:19706
+export KIBANA_AUTH=elastic:changeme
+
 ./sec-workflow-eval
 ```
 
@@ -35,29 +40,38 @@ cp /path/to/your/alerts.json fixtures/alerts.json
 
 Both scripts share three environment variables for connection:
 
-| Variable      | Purpose                        | Default (local dev)              |
+| Variable      | Purpose                        | Default                          |
 |---------------|--------------------------------|----------------------------------|
 | `KIBANA_URL`  | Kibana base URL                | Auto-detected at `localhost:5601`|
 | `KIBANA_AUTH` | Credentials as `user:password` | `elastic:changeme`               |
-| `ES_URL`      | Elasticsearch base URL         | Derived from `KIBANA_URL` (port 5601 → 9200) |
+| `ES_URL`      | Elasticsearch base URL         | Derived from `KIBANA_URL` (port 5601 → 9200 only) |
 
-### Local dev
+Auto-detection only tries `localhost:5601`. If your Kibana runs on a different
+port you **must** set all three variables explicitly.
 
-No configuration needed — Kibana is auto-detected at `localhost:5601` or
-`localhost:5601` (HTTPS) with `elastic:changeme`.
+### Local dev (default ports)
+
+```bash
+./sec-workflow-eval  # auto-detects localhost:5601, ES on :9200
+```
+
+### Local dev (non-standard ports)
+
+```bash
+export KIBANA_URL=http://localhost:9720
+export ES_URL=http://localhost:19706
+export KIBANA_AUTH=elastic:changeme
+./sec-workflow-eval
+```
 
 ### Remote / Elastic Cloud
-
-On cloud deployments, Kibana and Elasticsearch have **different hostnames**, so
-you must set `ES_URL` explicitly (the automatic port-swap doesn't apply):
 
 ```bash
 export KIBANA_URL=https://my-deployment.kb.us-west2.gcp.elastic-cloud.com
 export ES_URL=https://my-deployment.es.us-west2.gcp.elastic-cloud.com
 export KIBANA_AUTH=elastic:my-cloud-password
+./sec-workflow-eval
 ```
-
-Then run either script as normal.
 
 ---
 
@@ -69,7 +83,7 @@ Standalone script that prepares alert data. No Kibana repo required.
 
 1. Deletes existing security alerts
 2. Ensures the Insights detection rule exists
-3. Attaches a workflow action to all rules
+3. Attaches the Insights rule to the managed Alert Analysis workflow
 4. Indexes fixture data into `insights-alerts-*` (50% noise / 50% attack)
 5. Updates the rule lookback window and triggers it
 
@@ -95,7 +109,10 @@ sec-workflow-alerts [OPTIONS]
 ### Examples
 
 ```bash
-# Basic run against local Kibana
+# Basic run (requires env vars if not on default port 5601)
+export KIBANA_URL=http://localhost:9720
+export ES_URL=http://localhost:19706
+export KIBANA_AUTH=elastic:changeme
 ./sec-workflow-alerts
 
 # Index 50 alerts across 4 hosts
@@ -103,12 +120,6 @@ sec-workflow-alerts [OPTIONS]
 
 # Use a custom fixtures file
 ./sec-workflow-alerts --fixtures /path/to/my-alerts.json
-
-# Point at a cloud instance
-export KIBANA_URL=https://my-deployment.kb.us-west2.gcp.elastic-cloud.com
-export ES_URL=https://my-deployment.es.us-west2.gcp.elastic-cloud.com
-export KIBANA_AUTH=elastic:my-cloud-password
-./sec-workflow-alerts -n 30
 ```
 
 ---
