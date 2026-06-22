@@ -15,8 +15,9 @@ You can run them independently or together.
 - **bash** (4.x+)
 - **curl**
 - **python3** (3.8+, stdlib only — no pip install needed)
-- A running **Kibana + Elasticsearch** instance with the Alert Analysis workflow
-  enabled (`Security → Rules → Alert Analysis Workflow`)
+- A running **Kibana + Elasticsearch** instance
+- The **Alert Analysis Workflow** enabled in Kibana — go to
+  `Security → Rules → Alert Analysis Workflow` and toggle it on if it isn't already
 
 ## Quick start
 
